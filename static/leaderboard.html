@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>HackJudge — Leaderboard</title>
+  <link rel="stylesheet" href="style.css"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <style>
+    .lb-header { padding: 40px 0 28px; }
+    .lb-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .lb-count {
+      font-size: 13px;
+      color: var(--text-3);
+      margin-left: auto;
+    }
+    .track-filter {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .track-btn {
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+      border: 1px solid var(--border-md);
+      background: var(--surface);
+      color: var(--text-2);
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .track-btn.active, .track-btn:hover {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+
+    /* Team row expandable */
+    .team-name-cell {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .team-mini-avatar {
+      width: 30px; height: 30px;
+      border-radius: 8px;
+      background: var(--accent-bg);
+      color: var(--accent);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 700;
+      flex-shrink: 0;
+    }
+    .expand-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--text-3);
+      font-size: 13px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      transition: color .15s;
+    }
+    .expand-btn:hover { color: var(--text-1); }
+
+    /* Expandable detail row */
+    .detail-row { display: none; }
+    .detail-row.open { display: table-row; }
+    .detail-cell {
+      background: #fafaf8;
+      padding: 16px 20px !important;
+      border-bottom: 1px solid var(--border) !important;
+    }
+    .detail-inner {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .param-mini {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+    }
+    .param-mini-bar {
+      flex: 1;
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .param-mini-fill { height: 4px; border-radius: 2px; }
+    .param-mini-val { font-size: 12px; font-weight: 600; min-width: 24px; text-align: right; }
+
+    /* Score bubble */
+    .score-bubble {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 44px; height: 44px;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text-3);
+    }
+    .empty-state i { font-size: 40px; margin-bottom: 12px; display: block; }
+    .empty-state p { font-size: 15px; }
+
+    .refresh-indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--text-3);
+    }
+    .refresh-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--success);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: .3; }
+    }
+  </style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="header-inner">
+    <a href="/" class="logo">
+      <span class="logo-icon"><i class="fa-solid fa-gavel"></i></span>
+      HackJudge
+    </a>
+    <nav class="nav">
+      <a href="/">Submit</a>
+      <a href="/leaderboard.html" class="active">Leaderboard</a>
+    </nav>
+  </div>
+</header>
+
+<div class="page-wrap page-wrap--lg">
+  <div class="lb-header">
+    <div class="flex items-center gap-12 justify-between" style="flex-wrap:wrap;gap:12px">
+      <div>
+        <h1 class="page-title"><i class="fa-solid fa-trophy" style="color:#d4a017;margin-right:10px"></i>Live Leaderboard</h1>
+        <p class="page-sub">Rankings update automatically as projects are evaluated</p>
+      </div>
+      <div class="refresh-indicator">
+        <div class="refresh-dot"></div>
+        Auto-refreshes every 15s
+      </div>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="lb-controls">
+    <div class="track-filter" id="track-filter">
+      <button class="track-btn active" onclick="filterTrack('all', this)">All tracks</button>
+    </div>
+    <span class="lb-count" id="lb-count">Loading…</span>
+  </div>
+
+  <!-- Table -->
+  <div class="card">
+    <div class="table-wrap">
+      <table id="lb-table">
+        <thead>
+          <tr>
+            <th style="width:52px">Rank</th>
+            <th>Team & Project</th>
+            <th>Track</th>
+            <th style="text-align:center">Innovation</th>
+            <th style="text-align:center">Technical</th>
+            <th style="text-align:center">Completeness</th>
+            <th style="text-align:center">PS Align</th>
+            <th style="text-align:center">Code</th>
+            <th style="text-align:center;width:80px">Total</th>
+            <th style="width:40px"></th>
+          </tr>
+        </thead>
+        <tbody id="lb-tbody">
+          <tr>
+            <td colspan="10">
+              <div class="empty-state">
+                <span class="spinner" style="margin:0 auto 12px;display:block;width:28px;height:28px"></span>
+                <p>Loading submissions…</p>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div style="height:48px"></div>
+</div>
+
+<script>
+let allData = [];
+let activeTrack = 'all';
+
+const PARAM_KEYS = [
+  { key: 'innovation',          color: '#534AB7' },
+  { key: 'technical_execution', color: '#0F6E56' },
+  { key: 'completeness',        color: '#993C1D' },
+  { key: 'ps_alignment',        color: '#185FA5' },
+  { key: 'code_quality',        color: '#854F0B' },
+];
+
+function scoreColor(s) {
+  if (s >= 8)  return { text: 'var(--success)', bg: 'var(--success-bg)' };
+  if (s >= 6)  return { text: 'var(--info)',    bg: 'var(--info-bg)'    };
+  if (s >= 4)  return { text: 'var(--warn)',    bg: 'var(--warn-bg)'    };
+  return             { text: 'var(--danger)',   bg: 'var(--danger-bg)'  };
+}
+
+function rankClass(i) {
+  if (i === 0) return 'rank-1';
+  if (i === 1) return 'rank-2';
+  if (i === 2) return 'rank-3';
+  return '';
+}
+
+function toggleDetail(id) {
+  const row = document.getElementById(`detail-${id}`);
+  const icon = document.getElementById(`icon-${id}`);
+  if (row.classList.toggle('open')) {
+    icon.className = 'fa-solid fa-chevron-up';
+  } else {
+    icon.className = 'fa-solid fa-chevron-down';
+  }
+}
+
+function buildTracks(data) {
+  const tracks = [...new Set(data.map(d => d.track).filter(Boolean))];
+  const filter = document.getElementById('track-filter');
+  filter.innerHTML = `<button class="track-btn active" onclick="filterTrack('all',this)">All tracks</button>`;
+  tracks.forEach(t => {
+    filter.innerHTML += `<button class="track-btn" onclick="filterTrack('${t}',this)">${t}</button>`;
+  });
+}
+
+function filterTrack(track, btn) {
+  activeTrack = track;
+  document.querySelectorAll('.track-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderTable();
+}
+
+function renderTable() {
+  const data = activeTrack === 'all'
+    ? allData
+    : allData.filter(d => d.track === activeTrack);
+
+  const count = document.getElementById('lb-count');
+  count.textContent = `${data.length} submission${data.length !== 1 ? 's' : ''}`;
+
+  const tbody = document.getElementById('lb-tbody');
+
+  if (data.length === 0) {
+    tbody.innerHTML = `
+      <tr><td colspan="10">
+        <div class="empty-state">
+          <i class="fa-solid fa-inbox"></i>
+          <p>No scored submissions yet. <a href="/" style="color:var(--accent)">Be the first to submit!</a></p>
+        </div>
+      </td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = '';
+  data.forEach((sub, i) => {
+    const sc = scoreColor(sub.total_score);
+    const scores = sub.scores || {};
+    const fb = sub.feedback || {};
+
+    // Main row
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>
+        <div class="rank-num ${rankClass(i)}">${i + 1}</div>
+      </td>
+      <td>
+        <div class="team-name-cell">
+          <div class="team-mini-avatar">${(sub.team_name||'?').charAt(0).toUpperCase()}</div>
+          <div>
+            <div style="font-weight:600;font-size:14px">${sub.team_name}</div>
+            <div style="font-size:12px;color:var(--text-3)">${sub.project_title}</div>
+          </div>
+        </div>
+      </td>
+      <td><span class="badge badge-accent" style="font-size:11px">${sub.track||'—'}</span></td>
+      ${PARAM_KEYS.map(p => {
+        const s = scores[p.key]?.score ?? 0;
+        const c = scoreColor(s);
+        return `<td style="text-align:center;font-size:14px;font-weight:600;color:${c.text}">${Number(s).toFixed(1)}</td>`;
+      }).join('')}
+      <td style="text-align:center">
+        <span class="score-bubble" style="color:${sc.text};background:${sc.bg}">
+          ${sub.total_score.toFixed(2)}
+        </span>
+      </td>
+      <td>
+        <button class="expand-btn" onclick="toggleDetail('${sub.id}')" title="Show details">
+          <i class="fa-solid fa-chevron-down" id="icon-${sub.id}"></i>
+        </button>
+      </td>`;
+    tbody.appendChild(tr);
+
+    // Detail row
+    const dtr = document.createElement('tr');
+    dtr.className = 'detail-row';
+    dtr.id = `detail-${sub.id}`;
+
+    const paramDetail = PARAM_KEYS.map(p => {
+      const s = scores[p.key];
+      if (!s) return '';
+      const c = scoreColor(s.score);
+      return `
+        <div>
+          <div style="font-size:11px;font-weight:600;color:var(--text-3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">
+            ${p.key.replace(/_/g,' ')}
+          </div>
+          <div class="param-mini">
+            <span style="font-size:12px;font-weight:700;color:${c.text};min-width:24px">${Number(s.score).toFixed(1)}</span>
+            <div class="param-mini-bar">
+              <div class="param-mini-fill" style="width:${s.score*10}%;background:${p.color}"></div>
+            </div>
+          </div>
+          <p style="font-size:12px;color:var(--text-2);margin-top:5px;line-height:1.5">${s.reasoning||''}</p>
+        </div>`;
+    }).join('');
+
+    const strengths = (fb.strengths||[]).map(s => `<li style="font-size:12px;color:var(--text-2);margin-bottom:3px">${s}</li>`).join('');
+    const weaknesses= (fb.weaknesses||[]).map(w => `<li style="font-size:12px;color:var(--text-2);margin-bottom:3px">${w}</li>`).join('');
+
+    dtr.innerHTML = `
+      <td class="detail-cell" colspan="10">
+        <div style="margin-bottom:12px;font-size:13px;color:var(--text-2);background:var(--bg);padding:10px 12px;border-radius:var(--radius-sm);border-left:3px solid var(--accent)">
+          <strong>Inferred:</strong> ${fb.inferred_purpose || 'N/A'}
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:14px">
+          ${paramDetail}
+        </div>
+        ${fb.overall ? `<p style="font-size:13px;color:var(--text-2);margin-bottom:8px"><strong>Feedback:</strong> ${fb.overall}</p>` : ''}
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          ${strengths ? `<div><strong style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3)">Strengths</strong><ul style="margin-top:5px;padding-left:16px">${strengths}</ul></div>` : ''}
+          ${weaknesses? `<div><strong style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3)">To improve</strong><ul style="margin-top:5px;padding-left:16px">${weaknesses}</ul></div>` : ''}
+        </div>
+        <div style="margin-top:12px">
+          <a href="/judging.html?id=${sub.id}" class="btn btn-secondary" style="font-size:12px;padding:6px 14px">
+            <i class="fa-solid fa-arrow-right"></i> Full report
+          </a>
+        </div>
+      </td>`;
+    tbody.appendChild(dtr);
+  });
+}
+
+async function fetchLeaderboard() {
+  try {
+    const res = await fetch('/api/submissions');
+    if (!res.ok) throw new Error('Failed');
+    allData = await res.json();
+    buildTracks(allData);
+    renderTable();
+  } catch (e) {
+    document.getElementById('lb-tbody').innerHTML = `
+      <tr><td colspan="10">
+        <div class="empty-state" style="color:var(--danger)">
+          <i class="fa-solid fa-circle-exclamation"></i>
+          <p>Failed to load leaderboard. <button onclick="fetchLeaderboard()" style="color:var(--accent);background:none;border:none;cursor:pointer;font-size:15px">Retry</button></p>
+        </div>
+      </td></tr>`;
+  }
+}
+
+// Initial load + auto-refresh
+fetchLeaderboard();
+setInterval(fetchLeaderboard, 15000);
+</script>
+</body>
+</html>

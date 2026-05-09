@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>HackJudge — Live Evaluation</title>
+  <link rel="stylesheet" href="style.css"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <style>
+    .eval-header {
+      padding: 32px 0 24px;
+    }
+    .team-meta {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+    .team-avatar {
+      width: 48px; height: 48px;
+      border-radius: 12px;
+      background: var(--accent-bg);
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    /* Progress strip */
+    .progress-strip {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 16px 20px;
+      margin-bottom: 20px;
+    }
+    .progress-top {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+    .progress-label { font-size: 14px; font-weight: 500; flex: 1; }
+    .progress-pct   { font-size: 13px; color: var(--text-3); }
+
+    /* Repo info */
+    .repo-info-card {
+      background: var(--success-bg);
+      border: 1px solid rgba(15,110,86,.2);
+      border-radius: var(--radius-md);
+      padding: 14px 18px;
+      margin-bottom: 20px;
+      display: none;
+    }
+    .repo-info-card.visible { display: block; }
+    .repo-info-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--success);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    /* Params grid */
+    .params-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    @media(max-width:640px){ .params-grid { grid-template-columns:1fr; } }
+
+    /* Final score */
+    .final-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 32px;
+      display: none;
+      text-align: center;
+      box-shadow: var(--shadow);
+    }
+    .final-card.visible { display: block; }
+    .final-score-num {
+      font-size: 64px;
+      font-weight: 800;
+      letter-spacing: -2px;
+      line-height: 1;
+    }
+    .final-score-sub { font-size: 14px; color: var(--text-3); margin-top: 4px; }
+    .feedback-section {
+      margin-top: 24px;
+      text-align: left;
+    }
+    .feedback-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--text-3);
+      margin-bottom: 8px;
+    }
+    .feedback-text {
+      font-size: 14px;
+      color: var(--text-2);
+      line-height: 1.65;
+    }
+    .strength-item {
+      display: flex;
+      gap: 9px;
+      font-size: 13px;
+      color: var(--text-2);
+      line-height: 1.5;
+      margin-bottom: 6px;
+    }
+    .strength-item i { color: var(--success); margin-top: 2px; flex-shrink: 0; }
+    .weakness-item   i { color: var(--danger); }
+    .inferred-box {
+      background: var(--bg);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+      font-size: 13px;
+      color: var(--text-2);
+      line-height: 1.6;
+      margin-bottom: 16px;
+      border-left: 3px solid var(--accent);
+    }
+    .mini-score-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
+      margin: 20px 0;
+    }
+    .mini-score {
+      text-align: center;
+      padding: 10px 6px;
+      background: var(--bg);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+    }
+    .mini-score-val { font-size: 18px; font-weight: 700; }
+    .mini-score-lbl { font-size: 10px; color: var(--text-3); margin-top: 3px; line-height: 1.3; }
+
+    /* Error card */
+    .error-card {
+      background: var(--danger-bg);
+      border: 1px solid rgba(153,60,29,.3);
+      border-radius: var(--radius-md);
+      padding: 20px 24px;
+      display: none;
+    }
+    .error-card.visible { display: block; }
+
+    /* confidence badge */
+    .conf-high   { background: var(--success-bg); color: var(--success); }
+    .conf-medium { background: var(--warn-bg);    color: var(--warn);    }
+    .conf-low    { background: var(--danger-bg);  color: var(--danger);  }
+  </style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="header-inner">
+    <a href="/" class="logo">
+      <span class="logo-icon"><i class="fa-solid fa-gavel"></i></span>
+      HackJudge
+    </a>
+    <nav class="nav">
+      <a href="/">Submit</a>
+      <a href="/leaderboard.html">Leaderboard</a>
+    </nav>
+  </div>
+</header>
+
+<div class="page-wrap page-wrap--sm">
+
+  <!-- Team header -->
+  <div class="eval-header">
+    <div class="team-meta">
+      <div class="team-avatar" id="team-avatar">?</div>
+      <div>
+        <h1 class="page-title" id="team-name">Loading…</h1>
+        <p class="page-sub" id="project-title"></p>
+      </div>
+      <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap" id="meta-badges"></div>
+    </div>
+  </div>
+
+  <!-- Progress strip -->
+  <div class="progress-strip">
+    <div class="progress-top">
+      <div class="spinner" id="spinner"></div>
+      <span class="progress-label" id="status-msg">Initialising…</span>
+      <span class="progress-pct" id="progress-pct">0%</span>
+    </div>
+    <div class="progress-wrap">
+      <div class="progress-bar" id="progress-bar"></div>
+    </div>
+  </div>
+
+  <!-- Repo info -->
+  <div class="repo-info-card" id="repo-info-card">
+    <div class="repo-info-title">
+      <i class="fa-brands fa-github"></i>
+      Repository fetched
+    </div>
+    <div class="chip-row" id="repo-chips"></div>
+  </div>
+
+  <!-- Error card -->
+  <div class="error-card" id="error-card">
+    <p style="font-weight:600;color:var(--danger);margin-bottom:6px">
+      <i class="fa-solid fa-circle-exclamation"></i> Evaluation failed
+    </p>
+    <p id="error-msg" style="font-size:14px;color:var(--danger)"></p>
+    <a href="/" class="btn btn-secondary" style="margin-top:16px;display:inline-flex">
+      <i class="fa-solid fa-arrow-left"></i> Try again
+    </a>
+  </div>
+
+  <!-- Parameter score cards -->
+  <div class="params-grid" id="params-grid"></div>
+
+  <!-- Final result card -->
+  <div class="final-card" id="final-card">
+    <p style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:8px">
+      Final Score
+    </p>
+    <div class="final-score-num" id="final-score-num">—</div>
+    <div class="final-score-sub">out of 10.0</div>
+
+    <!-- Mini score row -->
+    <div class="mini-score-grid" id="mini-score-grid"></div>
+
+    <div class="feedback-section">
+
+      <div id="inferred-box-wrap">
+        <div class="feedback-label">What the agent understood your project to be</div>
+        <div class="inferred-box" id="inferred-purpose"></div>
+      </div>
+
+      <div class="grid-2 gap-16">
+        <div>
+          <div class="feedback-label">Overall feedback</div>
+          <p class="feedback-text" id="overall-feedback"></p>
+        </div>
+        <div>
+          <div class="feedback-label">Strengths</div>
+          <div id="strengths-list"></div>
+          <div class="feedback-label mt-12">Areas to improve</div>
+          <div id="weaknesses-list"></div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:12px;margin-top:24px;flex-wrap:wrap">
+        <a href="/" class="btn btn-secondary">
+          <i class="fa-solid fa-plus"></i> Submit another
+        </a>
+        <a href="/leaderboard.html" class="btn btn-primary">
+          <i class="fa-solid fa-trophy"></i> View leaderboard
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div style="height:48px"></div>
+</div>
+
+<script>
+const PARAMS_META = {
+  innovation:         { label: "Innovation & Creativity",      weight: 25, color: "#534AB7" },
+  technical_execution:{ label: "Technical Execution",          weight: 30, color: "#0F6E56" },
+  completeness:       { label: "Project Completeness",         weight: 25, color: "#993C1D" },
+  ps_alignment:       { label: "PS Alignment",                 weight: 15, color: "#185FA5" },
+  code_quality:       { label: "Code Quality",                 weight:  5, color: "#854F0B" },
+};
+
+const params = new URLSearchParams(window.location.search);
+const submissionId = params.get('id');
+
+if (!submissionId) {
+  window.location.href = '/';
+}
+
+// Load submission info
+async function loadMeta() {
+  try {
+    const res = await fetch(`/api/submission/${submissionId}`);
+    if (!res.ok) throw new Error('Not found');
+    const sub = await res.json();
+    fillMeta(sub);
+    return sub;
+  } catch (e) {
+    showError('Submission not found. Please re-submit.');
+    return null;
+  }
+}
+
+function fillMeta(sub) {
+  const name = sub.team_name || '—';
+  document.getElementById('team-name').textContent = name;
+  document.getElementById('project-title').textContent = sub.project_title || '';
+  document.getElementById('team-avatar').textContent = name.charAt(0).toUpperCase();
+  document.title = `HackJudge — ${name}`;
+
+  const badges = document.getElementById('meta-badges');
+  if (sub.track) badges.innerHTML += `<span class="badge badge-accent">${sub.track}</span>`;
+  if (sub.id)    badges.innerHTML += `<span class="badge badge-neutral font-mono">#${sub.id}</span>`;
+}
+
+function setProgress(pct, msg) {
+  document.getElementById('progress-bar').style.width = pct + '%';
+  document.getElementById('progress-pct').textContent = Math.round(pct) + '%';
+  if (msg) document.getElementById('status-msg').textContent = msg;
+}
+
+function showRepoInfo(data) {
+  const card = document.getElementById('repo-info-card');
+  const chips = document.getElementById('repo-chips');
+  card.classList.add('visible');
+
+  const items = [
+    { icon: 'fa-code', label: data.language },
+    { icon: 'fa-file-code', label: `${data.code_files} code files read` },
+    { icon: 'fa-folder', label: `${data.total_files} total files` },
+    { icon: data.has_readme ? 'fa-book' : 'fa-book-open', label: data.has_readme ? 'README found' : 'No README — code-only mode' },
+    { icon: 'fa-code-commit', label: `${data.commits} commits analysed` },
+    { icon: 'fa-box', label: data.has_deps ? 'Dependencies found' : 'No dep file' },
+  ];
+
+  chips.innerHTML = items.map(i =>
+    `<span class="chip"><i class="fa-solid ${i.icon}"></i>${i.label}</span>`
+  ).join('');
+}
+
+function addParamCard(data) {
+  const grid = document.getElementById('params-grid');
+  const id   = `param-${data.key}`;
+  const div  = document.createElement('div');
+  div.className = 'param-card';
+  div.id = id;
+
+  const scoreColor = data.score >= 8 ? 'var(--success)'
+                   : data.score >= 6 ? 'var(--info)'
+                   : data.score >= 4 ? 'var(--warn)'
+                   : 'var(--danger)';
+
+  div.innerHTML = `
+    <div class="param-card-header">
+      <div class="param-dot" style="background:${data.color}"></div>
+      <span class="param-name">${data.label}</span>
+      <span class="param-score-num" style="color:${scoreColor}">${data.score.toFixed(1)}</span>
+      <span class="param-weight">/${data.weight}%</span>
+    </div>
+    <div class="param-bar-wrap">
+      <div class="param-bar" id="bar-${data.key}" style="background:${data.color}"></div>
+    </div>
+    <p class="param-reasoning">${data.reasoning}</p>
+  `;
+  grid.appendChild(div);
+
+  // Trigger animations
+  requestAnimationFrame(() => {
+    div.classList.add('visible');
+    setTimeout(() => {
+      document.getElementById(`bar-${data.key}`).style.width = (data.score * 10) + '%';
+    }, 100);
+  });
+}
+
+function renderFinal(result) {
+  const score = result.total_score;
+  const numEl = document.getElementById('final-score-num');
+  numEl.textContent = score.toFixed(2);
+  numEl.style.color = score >= 8 ? 'var(--success)'
+                    : score >= 6 ? 'var(--info)'
+                    : score >= 4 ? 'var(--warn)'
+                    : 'var(--danger)';
+
+  // Mini score grid
+  const miniGrid = document.getElementById('mini-score-grid');
+  Object.entries(PARAMS_META).forEach(([key, meta]) => {
+    const s = result.scores?.[key]?.score ?? 0;
+    const sc = s >= 8 ? 'var(--success)' : s >= 6 ? 'var(--info)' : s >= 4 ? 'var(--warn)' : 'var(--danger)';
+    const cell = document.createElement('div');
+    cell.className = 'mini-score';
+    cell.innerHTML = `
+      <div class="mini-score-val" style="color:${sc}">${Number(s).toFixed(1)}</div>
+      <div class="mini-score-lbl">${meta.label.split(' ')[0]}</div>
+    `;
+    miniGrid.appendChild(cell);
+  });
+
+  // Confidence & mode
+  const confClass = `conf-${result.confidence || 'medium'}`;
+  const modeLabel = result.analysis_mode === 'readme_assisted' ? 'README assisted'
+                  : result.analysis_mode === 'description_assisted' ? 'Description assisted'
+                  : 'Code-only analysis';
+  document.getElementById('meta-badges').innerHTML += `
+    <span class="badge ${confClass}">Confidence: ${result.confidence}</span>
+    <span class="badge badge-neutral">${modeLabel}</span>
+  `;
+
+  // Inferred purpose
+  if (result.inferred_purpose) {
+    document.getElementById('inferred-purpose').textContent = result.inferred_purpose;
+  } else {
+    document.getElementById('inferred-box-wrap').style.display = 'none';
+  }
+
+  // Overall feedback
+  document.getElementById('overall-feedback').textContent = result.overall_feedback || '';
+
+  // Strengths
+  const sl = document.getElementById('strengths-list');
+  (result.strengths || []).forEach(s => {
+    sl.innerHTML += `<div class="strength-item"><i class="fa-solid fa-check"></i>${s}</div>`;
+  });
+
+  // Weaknesses
+  const wl = document.getElementById('weaknesses-list');
+  (result.weaknesses || []).forEach(w => {
+    wl.innerHTML += `<div class="strength-item weakness-item"><i class="fa-solid fa-arrow-right"></i>${w}</div>`;
+  });
+
+  document.getElementById('final-card').classList.add('visible');
+
+  // Stop spinner
+  document.getElementById('spinner').style.display = 'none';
+}
+
+function showError(msg) {
+  document.getElementById('error-card').classList.add('visible');
+  document.getElementById('error-msg').textContent = msg;
+  document.getElementById('spinner').style.display = 'none';
+  document.getElementById('params-grid').style.display = 'none';
+}
+
+async function startJudging() {
+  const sub = await loadMeta();
+  if (!sub) return;
+
+  // If already scored, replay
+  if (sub.status === 'scored' && sub.scores) {
+    setProgress(100, 'Evaluation already complete');
+    Object.entries(PARAMS_META).forEach(([key, meta]) => {
+      const s = sub.scores[key];
+      addParamCard({
+        key, label: meta.label, weight: meta.weight,
+        color: meta.color, score: s.score, reasoning: s.reasoning,
+      });
+    });
+    renderFinal({
+      total_score: sub.total_score,
+      scores: sub.scores,
+      ...sub.feedback,
+    });
+    return;
+  }
+
+  const es = new EventSource(`/api/judge/${submissionId}`);
+
+  es.onmessage = (e) => {
+    let event;
+    try { event = JSON.parse(e.data); }
+    catch { return; }
+
+    setProgress(event.progress || 0, event.message);
+
+    switch (event.type) {
+      case 'repo_info':
+        showRepoInfo(event.data);
+        break;
+
+      case 'score':
+        addParamCard(event.data);
+        break;
+
+      case 'complete':
+        es.close();
+        renderFinal(event.data);
+        break;
+
+      case 'already_scored':
+        es.close();
+        const d = event.data;
+        Object.entries(PARAMS_META).forEach(([key, meta]) => {
+          const s = d.scores?.[key];
+          if (s) addParamCard({ key, label: meta.label, weight: meta.weight, color: meta.color, score: s.score, reasoning: s.reasoning });
+        });
+        renderFinal({ total_score: d.total_score, scores: d.scores, ...d.feedback });
+        setProgress(100, 'Evaluation complete');
+        break;
+
+      case 'error':
+        es.close();
+        showError(event.message || 'Unknown error occurred.');
+        break;
+    }
+  };
+
+  es.onerror = () => {
+    es.close();
+    showError('Connection to evaluation server lost. Please try again.');
+  };
+}
+
+startJudging();
+</script>
+</body>
+</html>

@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Hackathon Judge — Submit Project</title>
+  <link rel="stylesheet" href="style.css"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <style>
+    .hero {
+      padding: 48px 0 32px;
+      text-align: center;
+    }
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--accent-bg);
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 600;
+      padding: 4px 12px;
+      border-radius: 20px;
+      margin-bottom: 16px;
+    }
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    .form-group { display: flex; flex-direction: column; }
+    .form-group.full { grid-column: 1 / -1; }
+    .key-field-wrap { position: relative; }
+    .key-toggle {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--text-3);
+      font-size: 15px;
+      padding: 4px;
+    }
+    .key-toggle:hover { color: var(--text-1); }
+    .section-divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 24px 0;
+    }
+    .submit-footer {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-top: 24px;
+    }
+    .char-count { font-size: 12px; color: var(--text-3); }
+    @media (max-width: 640px) {
+      .form-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<header class="site-header">
+  <div class="header-inner">
+    <a href="/" class="logo">
+      <span class="logo-icon"><i class="fa-solid fa-gavel"></i></span>
+      HackJudge
+    </a>
+    <nav class="nav">
+      <a href="/" class="active">Submit</a>
+      <a href="/leaderboard.html">Leaderboard</a>
+    </nav>
+  </div>
+</header>
+
+<!-- Hero -->
+<div class="page-wrap page-wrap--sm">
+  <div class="hero">
+    <div class="hero-badge"><i class="fa-solid fa-sparkles"></i> Powered by Gemini AI</div>
+    <h1 class="page-title">Hackathon Project Judge</h1>
+    <p class="page-sub">Submit your GitHub repository and get a live, AI-powered evaluation across 5 parameters in real time.</p>
+  </div>
+
+  <!-- Form card -->
+  <div class="card">
+    <div class="card-body">
+
+      <p class="section-head">Team information</p>
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="label" for="team_name">Team name <span style="color:var(--danger)">*</span></label>
+          <input class="input" id="team_name" type="text" placeholder="e.g. Team Phoenix" autocomplete="off"/>
+        </div>
+        <div class="form-group">
+          <label class="label" for="project_title">Project title <span style="color:var(--danger)">*</span></label>
+          <input class="input" id="project_title" type="text" placeholder="e.g. MediTrack AI" autocomplete="off"/>
+        </div>
+        <div class="form-group full">
+          <label class="label" for="member_names">Team member names <span style="color:var(--danger)">*</span></label>
+          <input class="input" id="member_names" type="text" placeholder="e.g. Alice Kumar, Bob Singh, Carol Mehta"/>
+        </div>
+        <div class="form-group">
+          <label class="label" for="contact_email">Contact email <span style="color:var(--danger)">*</span></label>
+          <input class="input" id="contact_email" type="email" placeholder="team@example.com"/>
+        </div>
+        <div class="form-group">
+          <label class="label" for="track">Track / category <span style="color:var(--danger)">*</span></label>
+          <input class="input" id="track" type="text" placeholder="e.g. HealthTech, FinTech, EdTech…"/>
+        </div>
+      </div>
+
+      <hr class="section-divider"/>
+      <p class="section-head">Problem statement</p>
+
+      <div class="form-group">
+        <label class="label" for="problem_statement">
+          Problem statement <span style="color:var(--danger)">*</span>
+        </label>
+        <textarea
+          class="textarea"
+          id="problem_statement"
+          rows="5"
+          placeholder="Paste the problem statement or challenge description here. The agent will evaluate how well your project addresses this specific problem."
+          style="min-height:120px"
+          oninput="updateCharCount(this)"
+        ></textarea>
+        <div class="flex justify-between mt-4">
+          <span class="hint">Be as specific as possible — this is the primary alignment benchmark.</span>
+          <span class="char-count" id="ps-count">0 characters</span>
+        </div>
+      </div>
+
+      <hr class="section-divider"/>
+      <p class="section-head">Project repository</p>
+
+      <div class="form-group">
+        <label class="label" for="github_url">GitHub repository URL <span style="color:var(--danger)">*</span></label>
+        <input
+          class="input"
+          id="github_url"
+          type="url"
+          placeholder="https://github.com/your-team/your-project"
+          autocomplete="off"
+        />
+        <span class="hint">Repository must be public. Private repos are not supported without a GitHub token.</span>
+      </div>
+
+      <div class="form-group mt-16">
+        <label class="label" for="project_description">
+          One-line description
+          <span style="font-weight:400;color:var(--text-3)">(optional but recommended if README is empty)</span>
+        </label>
+        <input
+          class="input"
+          id="project_description"
+          type="text"
+          placeholder="e.g. An ML-powered triage assistant that prioritises ER patients using vitals data"
+          autocomplete="off"
+        />
+        <span class="hint">Helps the agent understand your project when the README is sparse.</span>
+      </div>
+
+      <hr class="section-divider"/>
+      <p class="section-head">Gemini API credentials</p>
+
+      <div class="form-group">
+        <label class="label" for="gemini_api_key">Gemini API key <span style="color:var(--danger)">*</span></label>
+        <div class="key-field-wrap">
+          <input
+            class="input"
+            id="gemini_api_key"
+            type="password"
+            placeholder="AIza…"
+            autocomplete="off"
+            style="padding-right: 44px;"
+          />
+          <button class="key-toggle" id="toggle-key" onclick="toggleKeyVisibility()" title="Show/hide key">
+            <i class="fa-solid fa-eye" id="eye-icon"></i>
+          </button>
+        </div>
+        <span class="hint">
+          Get a free key at
+          <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:var(--accent)">
+            aistudio.google.com
+          </a>.
+          Your key is used only to evaluate your project and is never stored permanently.
+        </span>
+      </div>
+
+      <!-- Submit footer -->
+      <div class="submit-footer">
+        <button class="btn btn-primary btn-lg full-width" id="submit-btn" onclick="submitProject()">
+          <i class="fa-solid fa-play"></i>
+          Start Evaluation
+        </button>
+      </div>
+      <p id="submit-error" class="hidden" style="color:var(--danger);font-size:13px;margin-top:10px;text-align:center"></p>
+
+    </div>
+  </div>
+
+  <p style="text-align:center;font-size:12px;color:var(--text-3);margin:16px 0 40px">
+    Scores are generated by Gemini AI based on static code analysis · Results appear on the leaderboard after evaluation
+  </p>
+</div>
+
+<div id="toast-area"></div>
+
+<script>
+function updateCharCount(el) {
+  document.getElementById('ps-count').textContent = el.value.length + ' characters';
+}
+
+function toggleKeyVisibility() {
+  const inp = document.getElementById('gemini_api_key');
+  const ico = document.getElementById('eye-icon');
+  if (inp.type === 'password') {
+    inp.type = 'text';
+    ico.className = 'fa-solid fa-eye-slash';
+  } else {
+    inp.type = 'password';
+    ico.className = 'fa-solid fa-eye';
+  }
+}
+
+function val(id) { return document.getElementById(id).value.trim(); }
+
+function showError(msg) {
+  const el = document.getElementById('submit-error');
+  el.textContent = msg;
+  el.classList.remove('hidden');
+}
+
+function showToast(msg, isError = false) {
+  const area = document.getElementById('toast-area');
+  const t = document.createElement('div');
+  t.className = 'toast' + (isError ? ' toast-error' : '');
+  t.textContent = msg;
+  area.appendChild(t);
+  setTimeout(() => t.remove(), 4000);
+}
+
+async function submitProject() {
+  document.getElementById('submit-error').classList.add('hidden');
+
+  const fields = {
+    team_name:           val('team_name'),
+    project_title:       val('project_title'),
+    member_names:        val('member_names'),
+    contact_email:       val('contact_email'),
+    track:               val('track'),
+    problem_statement:   val('problem_statement'),
+    github_url:          val('github_url'),
+    gemini_api_key:      val('gemini_api_key'),
+    project_description: val('project_description'),
+  };
+
+  // Validation
+  const required = ['team_name','project_title','member_names','contact_email',
+                    'track','problem_statement','github_url','gemini_api_key'];
+  for (const k of required) {
+    if (!fields[k]) {
+      showError(`Please fill in: ${k.replace(/_/g,' ')}`);
+      return;
+    }
+  }
+  if (!fields.github_url.includes('github.com')) {
+    showError('Please enter a valid GitHub repository URL.');
+    return;
+  }
+  if (fields.problem_statement.length < 30) {
+    showError('Problem statement must be at least 30 characters.');
+    return;
+  }
+
+    const btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Submitting…';
+
+  try {
+    const res = await fetch('/api/submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(fields),
+    });
+
+    // Wipe the key from browser memory immediately after the request flies —
+    // regardless of success or failure. It never needs to live in the DOM again.
+    fields.gemini_api_key = '0'.repeat(fields.gemini_api_key.length);
+    document.getElementById('gemini_api_key').value = '';
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || 'Submission failed');
+    }
+
+    const data = await res.json();
+    showToast('Submission received! Redirecting to live judging…');
+    setTimeout(() => {
+      window.location.href = `/judging.html?id=${data.submission_id}`;
+    }, 800);
+
+  } catch (err) {
+    showError(err.message || 'Something went wrong. Please try again.');
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa-solid fa-play"></i> Start Evaluation';
+  }
+}
+
+// Allow Enter to submit from last field
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
+    const focused = document.activeElement?.id;
+    if (focused === 'gemini_api_key') submitProject();
+  }
+});
+</script>
+</body>
+</html>
