@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>HackJudge — Evaluation Report</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <style>
+    /* ── Base ───────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --accent:   #534AB7;
+      --success:  #0F6E56;
+      --info:     #185FA5;
+      --warn:     #854F0B;
+      --danger:   #993C1D;
+      --text-1:   #1a1a18;
+      --text-2:   #5c5c58;
+      --text-3:   #9c9a92;
+      --border:   #e8e6e0;
+      --bg:       #f5f4f0;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text-1);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    /* ── Screen toolbar ─────────────────────────────────── */
+    .toolbar {
+      background: #fff;
+      border-bottom: 1px solid var(--border);
+      padding: 12px 32px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .toolbar-logo {
+      display: flex; align-items: center; gap: 8px;
+      font-weight: 700; font-size: 15px; text-decoration: none; color: var(--text-1);
+    }
+    .toolbar-logo-icon {
+      width: 28px; height: 28px; background: var(--accent);
+      border-radius: 6px; display: flex; align-items: center;
+      justify-content: center; color: #fff; font-size: 14px;
+    }
+    .toolbar-sub { font-size: 12px; color: var(--text-3); flex: 1; }
+    .btn-print {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 18px; background: var(--accent); color: #fff;
+      border: none; border-radius: 8px; font-size: 13px;
+      font-weight: 600; cursor: pointer; text-decoration: none;
+      transition: background .15s;
+    }
+    .btn-print:hover { background: #453ea5; }
+    .btn-back {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 14px; background: var(--bg); color: var(--text-2);
+      border: 1px solid var(--border); border-radius: 8px;
+      font-size: 13px; cursor: pointer; text-decoration: none;
+    }
+
+    /* ── Report page ────────────────────────────────────── */
+    .report-page {
+      max-width: 800px;
+      margin: 32px auto;
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 2px 16px rgba(0,0,0,.07);
+      overflow: hidden;
+    }
+
+    /* Header stripe */
+    .report-header {
+      background: linear-gradient(135deg, #534AB7 0%, #2d2880 100%);
+      color: #fff;
+      padding: 36px 40px 28px;
+    }
+    .report-watermark {
+      font-size: 11px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: .12em; opacity: .7; margin-bottom: 12px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .report-project { font-size: 26px; font-weight: 800; margin-bottom: 4px; letter-spacing: -.3px; }
+    .report-team    { font-size: 15px; opacity: .85; margin-bottom: 16px; }
+    .report-meta-row { display: flex; flex-wrap: wrap; gap: 20px; margin-top: 4px; }
+    .report-meta-item { font-size: 12px; opacity: .75; display: flex; align-items: center; gap: 5px; }
+
+    /* Total score banner */
+    .score-banner {
+      background: #fff;
+      border-bottom: 1px solid var(--border);
+      padding: 28px 40px;
+      display: flex;
+      align-items: center;
+      gap: 32px;
+    }
+    .score-big {
+      font-size: 64px; font-weight: 800; line-height: 1;
+      letter-spacing: -2px;
+    }
+    .score-big-label { font-size: 13px; color: var(--text-3); margin-top: 4px; }
+    .score-mini-row {
+      flex: 1;
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 10px;
+    }
+    .score-mini-cell {
+      text-align: center;
+      padding: 10px 6px;
+      background: var(--bg);
+      border-radius: 10px;
+      border: 1px solid var(--border);
+    }
+    .score-mini-val { font-size: 20px; font-weight: 700; }
+    .score-mini-lbl { font-size: 10px; color: var(--text-3); margin-top: 2px; line-height: 1.3; }
+
+    /* Confidence / mode badges */
+    .badge-row { display: flex; gap: 8px; flex-wrap: wrap; padding: 14px 40px; border-bottom: 1px solid var(--border); background: #fafaf8; }
+    .badge {
+      font-size: 11px; padding: 3px 10px; border-radius: 20px; font-weight: 500;
+      border: 1px solid transparent;
+    }
+    .badge-accent   { background: #EEEDFE; color: var(--accent); }
+    .badge-success  { background: #E1F5EE; color: var(--success); }
+    .badge-warn     { background: #FAEEDA; color: var(--warn); }
+    .badge-danger   { background: #FAECE7; color: var(--danger); }
+    .badge-neutral  { background: var(--bg); color: var(--text-2); border-color: var(--border); }
+
+    /* Sections */
+    .report-section { padding: 28px 40px; border-bottom: 1px solid var(--border); }
+    .report-section:last-child { border-bottom: none; }
+    .section-title {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .1em; color: var(--text-3); margin-bottom: 16px;
+    }
+
+    /* Inferred purpose */
+    .inferred-box {
+      background: var(--bg);
+      border-left: 3px solid var(--accent);
+      border-radius: 0 8px 8px 0;
+      padding: 14px 16px;
+      font-size: 13px;
+      color: var(--text-2);
+      line-height: 1.65;
+    }
+
+    /* Parameter rows */
+    .param-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .param-row:last-child { border-bottom: none; }
+    .param-score-col { text-align: center; min-width: 52px; flex-shrink: 0; }
+    .param-score-num { font-size: 22px; font-weight: 700; line-height: 1; }
+    .param-score-wt  { font-size: 10px; color: var(--text-3); margin-top: 2px; }
+    .param-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; flex-shrink: 0; }
+    .param-body { flex: 1; }
+    .param-name { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+    .param-bar-wrap { height: 4px; background: var(--border); border-radius: 2px; margin-bottom: 8px; }
+    .param-bar { height: 4px; border-radius: 2px; }
+    .param-reasoning { font-size: 12px; color: var(--text-2); line-height: 1.6; }
+
+    /* Overall feedback */
+    .feedback-text { font-size: 13px; color: var(--text-2); line-height: 1.7; }
+    .sw-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 0; }
+    .sw-item { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; color: var(--text-2); margin-bottom: 8px; line-height: 1.5; }
+    .sw-item i { flex-shrink: 0; margin-top: 2px; }
+
+    /* Footer */
+    .report-footer {
+      padding: 20px 40px;
+      background: #fafaf8;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: var(--text-3);
+    }
+
+    /* Loading / error */
+    .loading-state {
+      text-align: center;
+      padding: 80px 32px;
+      color: var(--text-3);
+    }
+    .spinner {
+      width: 32px; height: 32px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      margin: 0 auto 16px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Print styles ───────────────────────────────────── */
+    @media print {
+      body { background: #fff; font-size: 12px; }
+      .toolbar { display: none !important; }
+      .report-page {
+        max-width: 100%;
+        margin: 0;
+        border-radius: 0;
+        box-shadow: none;
+      }
+      .report-header { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .btn-print, .btn-back { display: none; }
+      .param-row { break-inside: avoid; }
+      .sw-grid { break-inside: avoid; }
+      a { text-decoration: none; color: inherit; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Screen-only toolbar -->
+<div class="toolbar" id="toolbar">
+  <a href="/" class="toolbar-logo">
+    <span class="toolbar-logo-icon"><i class="fa-solid fa-gavel"></i></span>
+    HackJudge
+  </a>
+  <span class="toolbar-sub" id="toolbar-sub">Evaluation Report</span>
+  <a href="javascript:history.back()" class="btn-back">
+    <i class="fa-solid fa-arrow-left"></i> Back
+  </a>
+  <button class="btn-print" onclick="window.print()">
+    <i class="fa-solid fa-download"></i> Download PDF
+  </button>
+</div>
+
+<!-- Report page (prints cleanly) -->
+<div class="report-page" id="report-page">
+  <div class="loading-state" id="loading-state">
+    <div class="spinner"></div>
+    <p>Loading report…</p>
+  </div>
+</div>
+
+<script>
+const params = new URLSearchParams(window.location.search);
+const submissionId = params.get('id');
+
+if (!submissionId) window.location.href = '/';
+
+const PARAMS_META = [
+  { key: 'innovation',          label: 'Innovation & Creativity',      weight: 25, color: '#534AB7' },
+  { key: 'technical_execution', label: 'Technical Execution',          weight: 30, color: '#0F6E56' },
+  { key: 'completeness',        label: 'Project Completeness',         weight: 25, color: '#993C1D' },
+  { key: 'ps_alignment',        label: 'Problem Statement Alignment',  weight: 15, color: '#185FA5' },
+  { key: 'code_quality',        label: 'Code Quality & Best Practices', weight: 5, color: '#854F0B' },
+];
+
+function scoreColor(s) {
+  if (s >= 8) return '#0F6E56';
+  if (s >= 6) return '#185FA5';
+  if (s >= 4) return '#854F0B';
+  return '#993C1D';
+}
+
+function confBadge(c) {
+  if (c === 'high')   return 'badge-success';
+  if (c === 'medium') return 'badge-warn';
+  return 'badge-danger';
+}
+
+async function loadReport() {
+  try {
+    const res = await fetch(`/api/submission/${submissionId}`);
+    if (!res.ok) throw new Error('Not found');
+    const sub = await res.json();
+
+    if (!sub.scores || !sub.total_score) {
+      document.getElementById('loading-state').innerHTML = `
+        <i class="fa-solid fa-clock" style="font-size:32px;margin-bottom:12px;display:block;color:#854F0B"></i>
+        <p style="font-size:15px;color:#5c5c58">This project hasn't been evaluated yet.</p>
+        <a href="/judging.html?id=${submissionId}" style="color:#534AB7;font-size:13px;display:inline-block;margin-top:12px">
+          Go to evaluation page →
+        </a>`;
+      return;
+    }
+
+    const fb = sub.feedback || {};
+    const sc = sub.total_score;
+    const scColor = scoreColor(sc);
+    const modeLabel = fb.analysis_mode === 'readme_assisted'   ? 'README assisted'
+                    : fb.analysis_mode === 'description_assisted' ? 'Description assisted'
+                    : 'Code-only analysis';
+    const evalDate = new Date(sub.created_at).toLocaleDateString('en-IN', {
+      day: 'numeric', month: 'long', year: 'numeric',
+    });
+
+    // Update page title + toolbar
+    document.title = `Report — ${sub.team_name} | HackJudge`;
+    document.getElementById('toolbar-sub').textContent = `Report: ${sub.team_name}`;
+
+    // Mini score cells
+    const miniCells = PARAMS_META.map(p => {
+      const s = sub.scores[p.key]?.score ?? 0;
+      return `<div class="score-mini-cell">
+        <div class="score-mini-val" style="color:${scoreColor(s)}">${Number(s).toFixed(1)}</div>
+        <div class="score-mini-lbl">${p.label.split(' ')[0]}</div>
+      </div>`;
+    }).join('');
+
+    // Parameter detail rows
+    const paramRows = PARAMS_META.map(p => {
+      const s = sub.scores[p.key] || {};
+      const score = s.score ?? 0;
+      return `<div class="param-row">
+        <div class="param-score-col">
+          <div class="param-score-num" style="color:${scoreColor(score)}">${Number(score).toFixed(1)}</div>
+          <div class="param-score-wt">${p.weight}%</div>
+        </div>
+        <div class="param-dot" style="background:${p.color}"></div>
+        <div class="param-body">
+          <div class="param-name">${p.label}</div>
+          <div class="param-bar-wrap">
+            <div class="param-bar" style="width:${score*10}%;background:${p.color}"></div>
+          </div>
+          <div class="param-reasoning">${s.reasoning || '—'}</div>
+        </div>
+      </div>`;
+    }).join('');
+
+    // Strengths / weaknesses
+    const strengths  = (fb.strengths  || []).map(s => `<div class="sw-item"><i class="fa-solid fa-check" style="color:#0F6E56"></i>${s}</div>`).join('');
+    const weaknesses = (fb.weaknesses || []).map(w => `<div class="sw-item"><i class="fa-solid fa-arrow-right" style="color:#993C1D"></i>${w}</div>`).join('');
+
+    const page = document.getElementById('report-page');
+    page.innerHTML = `
+      <!-- Header -->
+      <div class="report-header">
+        <div class="report-watermark">
+          <i class="fa-solid fa-gavel"></i> HackJudge AI Evaluation Report
+        </div>
+        <div class="report-project">${sub.project_title}</div>
+        <div class="report-team">by ${sub.team_name}</div>
+        <div class="report-meta-row">
+          <span class="report-meta-item"><i class="fa-solid fa-users"></i> ${sub.member_names}</span>
+          <span class="report-meta-item"><i class="fa-solid fa-tag"></i> ${sub.track}</span>
+          <span class="report-meta-item"><i class="fa-solid fa-calendar"></i> ${evalDate}</span>
+          <span class="report-meta-item"><i class="fa-solid fa-id-badge"></i> #${sub.id}</span>
+        </div>
+      </div>
+
+      <!-- Total score -->
+      <div class="score-banner">
+        <div>
+          <div class="score-big" style="color:${scColor}">${Number(sc).toFixed(2)}</div>
+          <div class="score-big-label">out of 10.0</div>
+        </div>
+        <div class="score-mini-row">${miniCells}</div>
+      </div>
+
+      <!-- Badges -->
+      <div class="badge-row">
+        <span class="badge badge-accent">${sub.track}</span>
+        <span class="badge ${confBadge(fb.confidence)}">Confidence: ${fb.confidence || 'medium'}</span>
+        <span class="badge badge-neutral">${modeLabel}</span>
+        <span class="badge badge-neutral">#${sub.id}</span>
+      </div>
+
+      <!-- Inferred purpose -->
+      ${fb.inferred_purpose ? `
+      <div class="report-section">
+        <div class="section-title">What the AI understood your project to be</div>
+        <div class="inferred-box">${fb.inferred_purpose}</div>
+      </div>` : ''}
+
+      <!-- Parameter breakdown -->
+      <div class="report-section">
+        <div class="section-title">Parameter breakdown</div>
+        ${paramRows}
+      </div>
+
+      <!-- Feedback -->
+      ${fb.overall ? `
+      <div class="report-section">
+        <div class="section-title">Overall feedback</div>
+        <p class="feedback-text">${fb.overall}</p>
+      </div>` : ''}
+
+      <!-- Strengths & weaknesses -->
+      ${(strengths || weaknesses) ? `
+      <div class="report-section">
+        <div class="sw-grid">
+          ${strengths  ? `<div><div class="section-title">Strengths</div>${strengths}</div>` : ''}
+          ${weaknesses ? `<div><div class="section-title">Areas to improve</div>${weaknesses}</div>` : ''}
+        </div>
+      </div>` : ''}
+
+      <!-- Problem statement -->
+      <div class="report-section">
+        <div class="section-title">Problem statement</div>
+        <p class="feedback-text">${sub.problem_statement}</p>
+      </div>
+
+      <!-- Footer -->
+      <div class="report-footer">
+        <span>Generated by HackJudge — AI-Powered Hackathon Evaluation</span>
+        <span>Evaluated on ${evalDate} · Submission #${sub.id}</span>
+      </div>`;
+
+  } catch (e) {
+    document.getElementById('loading-state').innerHTML = `
+      <i class="fa-solid fa-circle-exclamation" style="font-size:32px;color:#993C1D;display:block;margin-bottom:12px"></i>
+      <p style="color:#993C1D">Report not found or not yet evaluated.</p>
+      <a href="/" style="color:#534AB7;font-size:13px;display:inline-block;margin-top:12px">← Go back</a>`;
+  }
+}
+
+loadReport();
+</script>
+</body>
+</html>

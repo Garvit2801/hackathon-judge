@@ -258,8 +258,11 @@
       </div>
 
       <div style="display:flex;gap:12px;margin-top:24px;flex-wrap:wrap">
-        <a href="/" class="btn btn-secondary">
-          <i class="fa-solid fa-plus"></i> Submit another
+        <button class="btn btn-secondary" onclick="openRejudgeModal()">
+          <i class="fa-solid fa-rotate-right"></i> Re-evaluate
+        </button>
+        <a id="report-btn" href="#" target="_blank" class="btn btn-secondary">
+          <i class="fa-solid fa-file-pdf"></i> Download Report
         </a>
         <a href="/leaderboard.html" class="btn btn-primary">
           <i class="fa-solid fa-trophy"></i> View leaderboard
@@ -430,6 +433,9 @@ function renderFinal(result) {
 
   document.getElementById('final-card').classList.add('visible');
 
+  // Wire up report download link (only visible to this user via submission ID)
+  document.getElementById('report-btn').href = `/report.html?id=${submissionId}`;
+
   // Stop spinner
   document.getElementById('spinner').style.display = 'none';
 }
@@ -441,29 +447,39 @@ function showError(msg) {
   document.getElementById('params-grid').style.display = 'none';
 }
 
+// Module-scope so reconnect counter survives multiple startJudging() calls
+let reconnectAttempts = 0;
+const MAX_RECONNECTS = 3;
+let activeES = null;
+
+function replayScored(sub) {
+  setProgress(100, 'Evaluation complete');
+  Object.entries(PARAMS_META).forEach(([key, meta]) => {
+    const s = sub.scores?.[key];
+    if (s && !document.getElementById('param-' + key)) {
+      addParamCard({ key, label: meta.label, weight: meta.weight,
+                     color: meta.color, score: s.score, reasoning: s.reasoning });
+    }
+  });
+  renderFinal({ total_score: sub.total_score, scores: sub.scores, ...sub.feedback });
+  document.getElementById('spinner').style.display = 'none';
+}
+
 async function startJudging() {
+  // Close any existing stream before opening a new one
+  if (activeES) { activeES.close(); activeES = null; }
+
   const sub = await loadMeta();
   if (!sub) return;
 
-  // If already scored, replay
+  // Already scored — replay from cache, no SSE needed
   if (sub.status === 'scored' && sub.scores) {
-    setProgress(100, 'Evaluation already complete');
-    Object.entries(PARAMS_META).forEach(([key, meta]) => {
-      const s = sub.scores[key];
-      addParamCard({
-        key, label: meta.label, weight: meta.weight,
-        color: meta.color, score: s.score, reasoning: s.reasoning,
-      });
-    });
-    renderFinal({
-      total_score: sub.total_score,
-      scores: sub.scores,
-      ...sub.feedback,
-    });
+    replayScored(sub);
     return;
   }
 
   const es = new EventSource(`/api/judge/${submissionId}`);
+  activeES = es;
 
   es.onmessage = (e) => {
     let event;
@@ -473,6 +489,10 @@ async function startJudging() {
     setProgress(event.progress || 0, event.message);
 
     switch (event.type) {
+      case 'heartbeat':
+        setProgress(event.progress || 50, event.message);
+        break;
+
       case 'repo_info':
         showRepoInfo(event.data);
         break;
@@ -482,35 +502,237 @@ async function startJudging() {
         break;
 
       case 'complete':
-        es.close();
+        es.close(); activeES = null;
+        reconnectAttempts = 0;
         renderFinal(event.data);
         break;
 
       case 'already_scored':
-        es.close();
+        es.close(); activeES = null;
+        reconnectAttempts = 0;
         const d = event.data;
         Object.entries(PARAMS_META).forEach(([key, meta]) => {
           const s = d.scores?.[key];
-          if (s) addParamCard({ key, label: meta.label, weight: meta.weight, color: meta.color, score: s.score, reasoning: s.reasoning });
+          if (s) addParamCard({ key, label: meta.label, weight: meta.weight,
+                                color: meta.color, score: s.score, reasoning: s.reasoning });
         });
         renderFinal({ total_score: d.total_score, scores: d.scores, ...d.feedback });
         setProgress(100, 'Evaluation complete');
         break;
 
+      case 'key_gone':
+        // Server restarted — key wiped. Show re-evaluate modal, never reconnect.
+        es.close(); activeES = null;
+        reconnectAttempts = 0;
+        document.getElementById('spinner').style.display = 'none';
+        setProgress(0, 'API key expired — re-evaluation required');
+        openRejudgeModal(event.message);
+        break;
+
       case 'error':
-        es.close();
+        es.close(); activeES = null;
         showError(event.message || 'Unknown error occurred.');
         break;
     }
   };
 
   es.onerror = () => {
-    es.close();
-    showError('Connection to evaluation server lost. Please try again.');
+    es.close(); activeES = null;
+
+    // First: check if scoring already completed while connection was dropping
+    fetch(`/api/submission/${submissionId}`)
+      .then(r => r.json())
+      .then(sub => {
+        if (sub.status === 'scored' && sub.scores) {
+          // Completed server-side — just display results
+          reconnectAttempts = 0;
+          replayScored(sub);
+          return;
+        }
+        if (sub.status === 'pending') {
+          // key_gone reset the status — prompt re-evaluate, do NOT loop
+          reconnectAttempts = 0;
+          setProgress(0, 'Session expired — please re-evaluate');
+          openRejudgeModal('Your session expired. Enter your API key to re-evaluate.');
+          return;
+        }
+        // Genuine network drop — retry with backoff
+        if (reconnectAttempts >= MAX_RECONNECTS) {
+          showError('Connection lost after several retries. Refresh in 30 seconds, or click Re-evaluate.');
+          reconnectAttempts = 0;
+          return;
+        }
+        reconnectAttempts++;
+        const delay = reconnectAttempts * 4000;
+        setProgress(null, `Connection dropped — retrying in ${delay/1000}s (${reconnectAttempts}/${MAX_RECONNECTS})…`);
+        setTimeout(startJudging, delay);
+      })
+      .catch(() => {
+        if (reconnectAttempts >= MAX_RECONNECTS) {
+          showError('Connection lost. Refresh the page to check results.');
+          reconnectAttempts = 0;
+          return;
+        }
+        reconnectAttempts++;
+        setTimeout(startJudging, reconnectAttempts * 4000);
+      });
   };
 }
 
 startJudging();
+</script>
+<!-- Re-evaluate modal -->
+<div id="rejudge-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);align-items:center;justify-content:center;z-index:200;padding:24px">
+  <div style="background:var(--surface);border-radius:var(--radius-lg);padding:28px 32px;width:100%;max-width:440px;box-shadow:0 8px 40px rgba(0,0,0,0.18)">
+    <div style="font-size:18px;font-weight:700;margin-bottom:6px">
+      <i class="fa-solid fa-rotate-right" style="color:var(--accent);margin-right:8px"></i>Re-evaluate project
+    </div>
+    <div style="font-size:13px;color:var(--text-2);margin-bottom:20px;line-height:1.6">
+      Your API key was wiped after the last evaluation for security.
+      Enter it again to re-run — useful after pushing new code to the repo.
+    </div>
+    <label class="label" for="rejudge-key">Gemini API key <span style="color:var(--danger)">*</span></label>
+    <div style="position:relative">
+      <input class="input" id="rejudge-key" type="password"
+        placeholder="AIza…" autocomplete="off" style="padding-right:44px"
+        onkeydown="if(event.key==='Enter') submitRejudge()"/>
+      <button onclick="toggleRejudgeKey()"
+        style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-3);font-size:15px;padding:4px">
+        <i class="fa-solid fa-eye" id="rejudge-eye"></i>
+      </button>
+    </div>
+    <p id="rejudge-error" style="display:none;color:var(--danger);font-size:13px;margin-top:8px"></p>
+    <div style="display:flex;gap:10px;margin-top:20px">
+      <button class="btn btn-secondary" style="flex:1" onclick="closeRejudgeModal()">Cancel</button>
+      <button class="btn btn-primary" style="flex:2" id="rejudge-btn" onclick="submitRejudge()">
+        <i class="fa-solid fa-play"></i> Start Re-evaluation
+      </button>
+    </div>
+    <p id="eval-count" style="margin-top:14px;font-size:12px;color:var(--text-3);text-align:center"></p>
+  </div>
+</div>
+
+<script>
+// ── Re-evaluate logic ─────────────────────────────────────────────────────────
+let evalRun = 0;
+
+function openRejudgeModal(msg) {
+  document.getElementById('rejudge-modal').style.display = 'flex';
+  document.getElementById('rejudge-key').value = '';
+  const errEl = document.getElementById('rejudge-error');
+  if (msg) {
+    errEl.textContent = msg;
+    errEl.style.display = 'block';
+  } else {
+    errEl.style.display = 'none';
+  }
+  const btn = document.getElementById('rejudge-btn');
+  btn.disabled = false;
+  btn.innerHTML = '<i class="fa-solid fa-play"></i> Start Re-evaluation';
+  document.getElementById('rejudge-key').focus();
+  const countEl = document.getElementById('eval-count');
+  if (evalRun > 0) countEl.textContent = `This project has been evaluated ${evalRun} time${evalRun>1?'s':''}.`;
+}
+
+function closeRejudgeModal() {
+  document.getElementById('rejudge-modal').style.display = 'none';
+  document.getElementById('rejudge-key').value = '';
+}
+
+function toggleRejudgeKey() {
+  const inp = document.getElementById('rejudge-key');
+  const ico = document.getElementById('rejudge-eye');
+  if (inp.type === 'password') {
+    inp.type = 'text';
+    ico.className = 'fa-solid fa-eye-slash';
+  } else {
+    inp.type = 'password';
+    ico.className = 'fa-solid fa-eye';
+  }
+}
+
+async function submitRejudge() {
+  const key = document.getElementById('rejudge-key').value.trim();
+  const errEl = document.getElementById('rejudge-error');
+  errEl.style.display = 'none';
+
+  if (!key) {
+    errEl.textContent = 'Please enter your Gemini API key.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  const btn = document.getElementById('rejudge-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner" style="width:16px;height:16px;border-width:2px"></span> Resetting…';
+
+  try {
+    const res = await fetch(`/api/rejudge/${submissionId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ gemini_api_key: key }),
+    });
+
+    // Wipe key from memory immediately after POST
+    document.getElementById('rejudge-key').value = '';
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || 'Re-evaluation request failed');
+    }
+
+    closeRejudgeModal();
+    resetUI();
+    evalRun++;
+    startJudging();
+
+  } catch (err) {
+    errEl.textContent = err.message || 'Something went wrong.';
+    errEl.style.display = 'block';
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa-solid fa-play"></i> Start Re-evaluation';
+  }
+}
+
+function resetUI() {
+  // Reset progress
+  document.getElementById('progress-bar').style.width = '0%';
+  document.getElementById('progress-pct').textContent = '0%';
+  document.getElementById('status-msg').textContent = 'Initialising…';
+  document.getElementById('spinner').style.display = 'flex';
+
+  // Clear param cards
+  document.getElementById('params-grid').innerHTML = '';
+  document.getElementById('params-grid').style.display = '';
+
+  // Hide repo info
+  const repoCard = document.getElementById('repo-info-card');
+  repoCard.classList.remove('visible');
+  document.getElementById('repo-chips').innerHTML = '';
+
+  // Hide final card
+  const finalCard = document.getElementById('final-card');
+  finalCard.classList.remove('visible');
+  document.getElementById('final-score-num').textContent = '—';
+  document.getElementById('mini-score-grid').innerHTML = '';
+  document.getElementById('inferred-purpose').textContent = '';
+  document.getElementById('overall-feedback').textContent = '';
+  document.getElementById('strengths-list').innerHTML = '';
+  document.getElementById('weaknesses-list').innerHTML = '';
+  document.getElementById('inferred-box-wrap').style.display = '';
+
+  // Hide error card
+  document.getElementById('error-card').classList.remove('visible');
+
+  // Strip confidence/mode badges (keep track + id badges only)
+  const badges = document.getElementById('meta-badges');
+  const keep = Array.from(badges.children).slice(0, 2);
+  badges.innerHTML = '';
+  keep.forEach(b => badges.appendChild(b));
+
+  // Reset reconnect counter
+  reconnectAttempts = 0;
+}
 </script>
 </body>
 </html>

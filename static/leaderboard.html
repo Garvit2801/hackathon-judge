@@ -134,6 +134,30 @@
       0%, 100% { opacity: 1; }
       50% { opacity: .3; }
     }
+    .th-score {
+      text-align: center;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+    .td-score {
+      text-align: center;
+      font-size: 15px;
+      font-weight: 700;
+      white-space: nowrap;
+      padding-left: 4px;
+      padding-right: 4px;
+    }
+    /* Prevent team cell from overflowing */
+    #lb-table td:nth-child(2) {
+      overflow: hidden;
+    }
+    #lb-table td:nth-child(3) {
+      overflow: hidden;
+    }
+    /* Total bubble centered */
+    #lb-table td:nth-child(9) {
+      text-align: center;
+    }
   </style>
 </head>
 <body>
@@ -176,19 +200,31 @@
   <!-- Table -->
   <div class="card">
     <div class="table-wrap">
-      <table id="lb-table">
+      <table id="lb-table" style="table-layout:fixed;width:100%">
+        <colgroup>
+          <col style="width:52px"/>         <!-- Rank -->
+          <col style="width:220px"/>        <!-- Team -->
+          <col style="width:140px"/>        <!-- Track -->
+          <col style="width:88px"/>         <!-- Innovation -->
+          <col style="width:88px"/>         <!-- Technical -->
+          <col style="width:104px"/>        <!-- Completeness -->
+          <col style="width:84px"/>         <!-- PS Align -->
+          <col style="width:68px"/>         <!-- Code -->
+          <col style="width:80px"/>         <!-- Total -->
+          <col style="width:36px"/>         <!-- Expand -->
+        </colgroup>
         <thead>
           <tr>
-            <th style="width:52px">Rank</th>
+            <th>Rank</th>
             <th>Team & Project</th>
             <th>Track</th>
-            <th style="text-align:center">Innovation</th>
-            <th style="text-align:center">Technical</th>
-            <th style="text-align:center">Completeness</th>
-            <th style="text-align:center">PS Align</th>
-            <th style="text-align:center">Code</th>
-            <th style="text-align:center;width:80px">Total</th>
-            <th style="width:40px"></th>
+            <th class="th-score">Innovation</th>
+            <th class="th-score">Technical</th>
+            <th class="th-score">Completeness</th>
+            <th class="th-score">PS Align</th>
+            <th class="th-score">Code</th>
+            <th class="th-score">Total</th>
+            <th></th>
           </tr>
         </thead>
         <tbody id="lb-tbody">
@@ -306,7 +342,7 @@ function renderTable() {
       ${PARAM_KEYS.map(p => {
         const s = scores[p.key]?.score ?? 0;
         const c = scoreColor(s);
-        return `<td style="text-align:center;font-size:14px;font-weight:600;color:${c.text}">${Number(s).toFixed(1)}</td>`;
+        return `<td class="td-score" style="color:${c.text}">${Number(s).toFixed(1)}</td>`;
       }).join('')}
       <td style="text-align:center">
         <span class="score-bubble" style="color:${sc.text};background:${sc.bg}">
@@ -360,11 +396,7 @@ function renderTable() {
           ${strengths ? `<div><strong style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3)">Strengths</strong><ul style="margin-top:5px;padding-left:16px">${strengths}</ul></div>` : ''}
           ${weaknesses? `<div><strong style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3)">To improve</strong><ul style="margin-top:5px;padding-left:16px">${weaknesses}</ul></div>` : ''}
         </div>
-        <div style="margin-top:12px">
-          <a href="/judging.html?id=${sub.id}" class="btn btn-secondary" style="font-size:12px;padding:6px 14px">
-            <i class="fa-solid fa-arrow-right"></i> Full report
-          </a>
-        </div>
+
       </td>`;
     tbody.appendChild(dtr);
   });

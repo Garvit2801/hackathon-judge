@@ -4,28 +4,72 @@ from github_client import get_repo_data
 from gemini_client import analyze_with_gemini, WEIGHTS
 
 PARAMETERS = [
-    ("innovation",         "Innovation & Creativity",       25, "#7F77DD"),
-    ("technical_execution","Technical Execution",            30, "#1D9E75"),
-    ("completeness",       "Project Completeness",           25, "#D85A30"),
-    ("ps_alignment",       "Problem Statement Alignment",    15, "#185FA5"),
-    ("code_quality",       "Code Quality & Best Practices",   5, "#854F0B"),
+    ("innovation",          "Innovation & Creativity",      25, "#7F77DD"),
+    ("technical_execution", "Technical Execution",          30, "#1D9E75"),
+    ("completeness",        "Project Completeness",         25, "#D85A30"),
+    ("ps_alignment",        "Problem Statement Alignment",  15, "#185FA5"),
+    ("code_quality",        "Code Quality & Best Practices", 5, "#854F0B"),
 ]
+
+# Heartbeat messages shown while Gemini is thinking
+_HEARTBEAT_MSGS = [
+    "Gemini is reading your code...",
+    "Analysing project structure...",
+    "Evaluating technical execution...",
+    "Checking problem statement alignment...",
+    "Almost there — finalising scores...",
+]
+
+
+async def _run_with_heartbeat(coro, heartbeat_queue: asyncio.Queue, interval: int = 12):
+    """
+    Run `coro` concurrently with a heartbeat task that pushes ping events
+    into `heartbeat_queue` every `interval` seconds.
+    Returns the result of `coro`.
+    """
+    msg_index = [0]
+
+    async def _heartbeat():
+        count = 0
+        while True:
+            await asyncio.sleep(interval)
+            msg = _HEARTBEAT_MSGS[msg_index[0] % len(_HEARTBEAT_MSGS)]
+            msg_index[0] += 1
+            await heartbeat_queue.put(_evt(
+                "heartbeat",
+                message=msg,
+                progress=50 + min(count * 2, 10),
+            ))
+            count += 1
+
+    beat_task = asyncio.create_task(_heartbeat())
+    try:
+        result = await coro
+    finally:
+        beat_task.cancel()
+        try:
+            await beat_task
+        except asyncio.CancelledError:
+            pass
+    return result
 
 
 async def judge_project(submission: dict, api_key: str) -> AsyncGenerator[dict, None]:
     """
     Async generator that yields SSE-compatible event dicts.
-    api_key is passed as a separate argument — never stored in submission dict.
-    Stages: start -> github_fetch -> repo_info -> gemini_start -> scores -> complete
+    Sends heartbeat pings every 12 s during the Gemini wait so the SSE
+    connection never goes silent long enough for a proxy to drop it.
+
+    Stages: start -> github_fetch -> repo_info -> gemini (with heartbeats)
+            -> scores (one per param) -> complete
     """
 
-    # Stage 1: Start
+    # Stage 1: start
     yield _evt("status", message="Initialising evaluation pipeline...", progress=5)
     await asyncio.sleep(0.3)
 
-    # Stage 2: Fetch GitHub repo
+    # Stage 2: GitHub fetch
     yield _evt("status", message="Connecting to GitHub and fetching repository...", progress=15)
-
     try:
         repo_data = await get_repo_data(submission["github_url"])
     except Exception as e:
@@ -49,7 +93,7 @@ async def judge_project(submission: dict, api_key: str) -> AsyncGenerator[dict, 
 
     yield _evt(
         "repo_info",
-        message=f"Repository fetched - {mode_label}",
+        message=f"Repository fetched — {mode_label}",
         progress=38,
         data={
             "has_readme":   has_readme,
@@ -64,27 +108,54 @@ async def judge_project(submission: dict, api_key: str) -> AsyncGenerator[dict, 
     )
     await asyncio.sleep(0.4)
 
-    # Stage 3: Gemini analysis — api_key used here only, never stored
+    # Stage 3: Gemini analysis with concurrent heartbeat
     yield _evt("status", message="Sending project to Gemini for deep analysis...", progress=50)
 
-    try:
-        result = await analyze_with_gemini(
-            repo_data,
-            submission["problem_statement"],
-            api_key,                              # passed directly, not from submission
-            submission.get("project_description", ""),
-        )
-    except Exception as e:
-        yield _evt("error", message=f"Gemini analysis failed: {str(e)}")
-        return
-    finally:
-        # Overwrite local reference immediately after use
-        api_key = None  # noqa: F841
+    heartbeat_queue: asyncio.Queue = asyncio.Queue()
 
-    yield _evt("status", message="Analysis complete - computing scores...", progress=62)
+    gemini_coro = analyze_with_gemini(
+        repo_data,
+        submission["problem_statement"],
+        api_key,
+        submission.get("project_description", ""),
+    )
+
+    # Run Gemini + heartbeat concurrently
+    gemini_task = asyncio.create_task(
+        _run_with_heartbeat(gemini_coro, heartbeat_queue, interval=12)
+    )
+
+    result = None
+    error = None
+
+    while not gemini_task.done():
+        # Drain any heartbeat events that arrived
+        while not heartbeat_queue.empty():
+            yield heartbeat_queue.get_nowait()
+
+        # Yield control briefly so the event loop can make progress
+        await asyncio.sleep(0.5)
+
+    # Drain remaining heartbeats
+    while not heartbeat_queue.empty():
+        yield heartbeat_queue.get_nowait()
+
+    try:
+        result = gemini_task.result()
+    except Exception as e:
+        error = str(e)
+
+    # Wipe key immediately after use
+    api_key = None  # noqa: F841
+
+    if error:
+        yield _evt("error", message=f"Gemini analysis failed: {error}")
+        return
+
+    yield _evt("status", message="Analysis complete — computing scores...", progress=62)
     await asyncio.sleep(0.4)
 
-    # Stage 4: Stream individual scores
+    # Stage 4: Stream scores one by one
     scores   = result.get("scores", {})
     progress = 64
 
@@ -109,7 +180,7 @@ async def judge_project(submission: dict, api_key: str) -> AsyncGenerator[dict, 
             },
         )
         progress += 6
-        await asyncio.sleep(1.0)   # deliberate pause for live reveal effect
+        await asyncio.sleep(1.0)
 
     # Stage 5: Final result
     final = {
@@ -123,7 +194,6 @@ async def judge_project(submission: dict, api_key: str) -> AsyncGenerator[dict, 
         "scores":           scores,
     }
 
-    # Persist scores into the submission dict (no key here)
     submission["scores"]      = scores
     submission["total_score"] = result["total_score"]
     submission["feedback"]    = {

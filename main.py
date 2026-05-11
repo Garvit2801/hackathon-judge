@@ -146,13 +146,28 @@ async def judge_stream(submission_id: str):
 
     # ── Key must be in vault to proceed ──────────────────────────
     if submission_id not in _key_vault:
-        # Server was restarted after submit but before judging — key is gone
-        raise HTTPException(
-            status_code=410,
-            detail=(
-                "API key no longer available (server may have restarted). "
-                "Please re-submit your project."
-            ),
+        # Server was restarted after submit but before judging — key is gone.
+        # Return an SSE stream with an error event (not HTTP 410) so the
+        # browser EventSource can show a proper message instead of looping.
+        submissions[submission_id]["status"] = "pending"
+        save_submissions(submissions)
+
+        async def key_gone():
+            payload = {
+                "type": "key_gone",
+                "message": (
+                    "API key is no longer available — the server was likely "
+                    "restarted after you submitted. Please click Re-evaluate "
+                    "and enter your Gemini API key to continue."
+                ),
+                "progress": 0,
+            }
+            yield f"data: {json.dumps(payload)}\n\n"
+
+        return StreamingResponse(
+            key_gone(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
 
     # Pull key into a local variable — wipe vault entry immediately after judging
@@ -193,9 +208,11 @@ async def judge_stream(submission_id: str):
         event_generator(),
         media_type="text/event-stream",
         headers={
-            "Cache-Control":    "no-cache",
-            "X-Accel-Buffering":"no",
-            "Connection":       "keep-alive",
+            "Cache-Control":         "no-cache",
+            "X-Accel-Buffering":     "no",   # tells nginx not to buffer SSE
+            "Connection":            "keep-alive",
+            "Keep-Alive":            "timeout=300",
+            "X-Content-Type-Options":"nosniff",
         },
     )
 
@@ -236,6 +253,35 @@ async def get_submission(submission_id: str):
         raise HTTPException(status_code=404, detail="Submission not found")
     # submissions dict never contains gemini_api_key — safe to return as-is
     return submissions[submission_id]
+
+
+@app.post("/api/rejudge/{submission_id}")
+async def rejudge_project(submission_id: str, body: dict):
+    """
+    Reset a submission and put its API key back into the vault
+    so the SSE /api/judge/{id} endpoint can re-run the evaluation.
+    Accepts: { "gemini_api_key": "AIza..." }
+    """
+    submission_id = submission_id.upper()
+
+    if submission_id not in submissions:
+        raise HTTPException(status_code=404, detail="Submission not found")
+
+    api_key = (body.get("gemini_api_key") or "").strip()
+    if not api_key:
+        raise HTTPException(status_code=422, detail="gemini_api_key is required")
+
+    # Put key back in vault (memory-only)
+    _key_vault[submission_id] = api_key
+
+    # Reset submission state so /api/judge re-runs instead of replaying cache
+    submissions[submission_id]["status"]      = "pending"
+    submissions[submission_id]["scores"]      = None
+    submissions[submission_id]["total_score"] = None
+    submissions[submission_id]["feedback"]    = None
+    save_submissions(submissions)
+
+    return {"submission_id": submission_id, "status": "pending"}
 
 
 @app.get("/api/health")
