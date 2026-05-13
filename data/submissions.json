@@ -158,5 +158,21 @@
     "scores": null,
     "total_score": null,
     "feedback": null
+  },
+  "AB07055D": {
+    "id": "AB07055D",
+    "status": "judging",
+    "created_at": "2026-05-11T14:38:02.964398Z",
+    "team_name": "SSInnovaters",
+    "project_title": "AI for Healthcare",
+    "member_names": "Satya Padmanabhan Iyer",
+    "contact_email": "satyaiyer1984@gmail.com",
+    "track": "AI for Healthcare",
+    "problem_statement": "Healthcare providers spend excessive time on manual documentation, reducing patient engagement.\nInefficient coding and claim preparation lead to revenue leakage and delayed reimbursements.\nLack of automation in front-office operations results in administrative overhead and human errors.\nNeed for real-time, accurate, and compliant documentation from patient\u2013doctor conversations.",
+    "github_url": "https://github.com/SatyaIyerRaghav/AIMedicalScribe/tree/main",
+    "project_description": "A multi-agent clinical AI platform that converts consultations into compliant documentation, coding, billing-ready workflows, and clinician-reviewed care summaries in real time.",
+    "scores": null,
+    "total_score": null,
+    "feedback": null
   }
 }
