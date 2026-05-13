@@ -314,8 +314,7 @@ async function login() {
 
 function logout() {
   adminUser = ''; adminPass = '';
-  document.getElementById('admin-screen').style.display = 'none';
-  document.getElementById('login-screen').style.display = 'flex';
+  window.location.href = '/';
 }
 
 // ── Data ──────────────────────────────────────────────────────────────────────
