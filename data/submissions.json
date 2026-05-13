@@ -174,5 +174,76 @@
     "scores": null,
     "total_score": null,
     "feedback": null
+  },
+  "7A9E2000": {
+    "id": "7A9E2000",
+    "status": "judging",
+    "created_at": "2026-05-13T04:07:27.389404Z",
+    "team_name": "SSInnovaters",
+    "project_title": "AI for Healthcare",
+    "member_names": "Satya Padmanabhan Iyer",
+    "contact_email": "satyaiyer1984@gmail.com",
+    "track": "AI for Healthcare",
+    "problem_statement": "Healthcare providers spend excessive time on manual documentation, reducing patient engagement.\nInefficient coding and claim preparation lead to revenue leakage and delayed reimbursements.\nLack of automation in front-office operations results in administrative overhead and human errors.\nNeed for real-time, accurate, and compliant documentation from patient\u2013doctor conversations.",
+    "github_url": "https://github.com/SatyaIyerRaghav/AIMedicalScribe/tree/main",
+    "project_description": "A multi-agent clinical AI platform that converts consultations into compliant documentation, coding, billing-ready workflows, and clinician-reviewed care summaries in real time.",
+    "scores": {
+      "innovation": {
+        "score": 8.0,
+        "reasoning": "The project demonstrates a strong application of modern GenAI patterns (LangGraph for orchestration, CrewAI for agents) to a complex, real-world problem. The detailed Pydantic models for structured output across multiple stages (patient data, clinical notes, coding, compliance) show thoughtful design for integration and data integrity, which is a creative solution for healthcare data."
+      },
+      "technical_execution": {
+        "score": 7.0,
+        "reasoning": "The architecture using LangGraph and CrewAI is appropriate and well-structured, with good separation of concerns (config, agents, models). LLM configuration is flexible, supporting Bedrock and OpenAI. However, there's a discrepancy where transcription is handled directly by Whisper rather than a CrewAI agent as implied by the README, and the Streamlit UI has a critical bug where the final document generation function is not called."
+      },
+      "completeness": {
+        "score": 7.0,
+        "reasoning": "The core CLI pipeline (`src/run.py`) appears largely complete, processing audio through multiple stages to generate structured outputs and a PDF (evidenced by the sample output). The Streamlit application provides a functional UI for most steps, but the bug preventing the final document generation means the end-to-end flow is broken in the web interface, impacting overall completeness."
+      },
+      "ps_alignment": {
+        "score": 9.0,
+        "reasoning": "The solution directly and comprehensively addresses all aspects of the problem statement. It automates documentation (transcription, SOAP notes), streamlines coding/claim prep (ICD-10/CPT generation), reduces administrative overhead (front-office task), and focuses on real-time, accurate, and compliant output (compliance task, structured data). Each pipeline stage maps clearly to a problem requirement."
+      },
+      "code_quality": {
+        "score": 7.0,
+        "reasoning": "The code exhibits good modularity, uses Pydantic for robust data modeling, and includes dedicated logging setup. Configuration management via `config.yaml` and environment variables is also well-implemented. However, the presence of a critical bug in `app.py`, the lack of visible tests, and the absence of a license file detract from overall code quality and best practices."
+      }
+    },
+    "total_score": 7.55,
+    "feedback": {
+      "overall": "This project presents a well-conceived and architecturally sound solution to a significant problem in healthcare documentation. The use of LangGraph for orchestration and CrewAI for specialized agents is a strong choice, leading to a modular and extensible system. The detailed Pydantic models ensure structured and validated outputs, which is crucial for integration into existing healthcare systems. While the core CLI pipeline appears functional, the Streamlit UI has a critical bug preventing final document generation, and there's a minor inconsistency in how transcription is handled versus the stated agentic approach.",
+      "strengths": [
+        "Strong problem statement alignment, addressing multiple pain points in healthcare documentation and RCM.",
+        "Well-defined agentic architecture using LangGraph for orchestration and CrewAI for specialized tasks.",
+        "Comprehensive data modeling with Pydantic for structured and validated outputs.",
+        "Flexible LLM configuration supporting multiple providers (Bedrock, OpenAI) via environment variables.",
+        "Clear execution flow and modular code structure, enhancing maintainability."
+      ],
+      "weaknesses": [
+        "Critical bug in the Streamlit UI (`app.py`) preventing the final document generation step from executing.",
+        "Inconsistency between the README's claim of CrewAI encapsulating transcription and the actual direct Whisper implementation.",
+        "Lack of unit or integration tests to ensure reliability and prevent regressions.",
+        "Some code snippets provided (e.g., `src/agent_builder.py`) are incomplete, hindering full verification."
+      ],
+      "inferred_purpose": "This project aims to automate the entire front-office medical documentation process, from transcribing patient-doctor conversations to generating structured clinical notes, assigning billing codes (ICD-10/CPT), ensuring compliance, and producing final PDF/JSON summaries. It leverages an agentic AI pipeline built with LangGraph for orchestration and CrewAI for specialized tasks, providing both a command-line interface and a Streamlit web application.",
+      "confidence": "high",
+      "analysis_mode": "readme_assisted"
+    }
+  },
+  "FB5CD690": {
+    "id": "FB5CD690",
+    "status": "judging",
+    "created_at": "2026-05-13T04:24:05.399820Z",
+    "team_name": "URBEMO",
+    "project_title": "URBEMO",
+    "member_names": "Navya Nistha, Kartikeya Sunil Verma, Skand Chaturvedi",
+    "contact_email": "navyanistha268@gmail.com",
+    "track": "City Emotional Intelligence",
+    "problem_statement": "Urban cities are facing increasing challenges related to traffic congestion, pollution, public safety, waste management, resource utilization, and citizen well-being. Traditional city management systems often work in silos and lack real-time, data-driven insights, making it difficult for authorities to predict issues, respond quickly, and improve quality of life. There is a need for an intelligent smart city solution that integrates data from multiple urban sources, analyzes city conditions in real time, and supports faster, more efficient, and citizen-centric decision-making.",
+    "github_url": "https://github.com/navyaa-nistha/urbemo",
+    "project_description": "",
+    "scores": null,
+    "total_score": null,
+    "feedback": null
   }
 }
