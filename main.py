@@ -287,10 +287,79 @@ async def rejudge_project(submission_id: str, body: dict):
 @app.get("/api/health")
 async def health():
     return {
-        "status":      "ok",
-        "submissions": len(submissions),
-        "keys_in_vault": len(_key_vault),   # should be 0 when no judging is active
+        "status":        "ok",
+        "submissions":   len(submissions),
+        "keys_in_vault": len(_key_vault),
     }
+
+
+# ── Admin routes (password-protected, not linked anywhere in the UI) ──────────
+
+import os
+import hmac
+
+def _check_admin(username: str, password: str) -> bool:
+    """Validate username + password against env vars using timing-safe compare."""
+    valid_user = os.environ.get("ADMIN_USERNAME", "")
+    valid_pass = os.environ.get("ADMIN_PASSWORD", "")
+    if not valid_user or not valid_pass:
+        return False
+    user_ok = hmac.compare_digest(valid_user.strip(), username.strip())
+    pass_ok  = hmac.compare_digest(valid_pass.strip(), password.strip())
+    return user_ok and pass_ok
+
+
+@app.post("/api/admin/login")
+async def admin_login(body: dict):
+    """Validate admin credentials. Returns 200 on success, 403 on failure."""
+    username = body.get("username", "")
+    password = body.get("password", "")
+    if not _check_admin(username, password):
+        raise HTTPException(status_code=403, detail="Invalid username or password")
+    return {"status": "ok"}
+
+
+@app.get("/api/admin/submissions")
+async def admin_list_submissions(username: str = "", password: str = ""):
+    """Return ALL submissions (all statuses) for the admin panel."""
+    if not _check_admin(username, password):
+        raise HTTPException(status_code=403, detail="Invalid credentials")
+
+    result = []
+    for sub in submissions.values():
+        result.append({k: v for k, v in sub.items() if k != "gemini_api_key"})
+    result.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+    return result
+
+
+@app.delete("/api/admin/submission/{submission_id}")
+async def admin_delete_submission(submission_id: str, username: str = "", password: str = ""):
+    """Permanently delete a submission from the store."""
+    if not _check_admin(username, password):
+        raise HTTPException(status_code=403, detail="Invalid admin key")
+
+    submission_id = submission_id.upper()
+    if submission_id not in submissions:
+        raise HTTPException(status_code=404, detail="Submission not found")
+
+    del submissions[submission_id]
+    _wipe_key(submission_id)          # remove from vault too if pending
+    save_submissions(submissions)
+    return {"deleted": submission_id}
+
+
+@app.delete("/api/admin/submissions/all")
+async def admin_delete_all_submissions(username: str = "", password: str = ""):
+    """Delete ALL submissions — use with caution."""
+    if not _check_admin(username, password):
+        raise HTTPException(status_code=403, detail="Invalid admin key")
+
+    ids = list(submissions.keys())
+    for sid in ids:
+        del submissions[sid]
+        _wipe_key(sid)
+    save_submissions(submissions)
+    return {"deleted_count": len(ids)}
 
 
 # ── Serve frontend ────────────────────────────────────────────────────────────

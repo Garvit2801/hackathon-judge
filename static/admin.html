@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>HackJudge — Admin</title>
+  <!-- No link to this page exists anywhere in the app.
+       Access via: /admin.html                          -->
+  <link rel="stylesheet" href="style.css"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <style>
+    .login-wrap {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .login-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 40px;
+      width: 100%;
+      max-width: 400px;
+      box-shadow: var(--shadow);
+      text-align: center;
+    }
+    .admin-icon {
+      width: 52px; height: 52px;
+      background: var(--danger-bg);
+      border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; color: var(--danger);
+      margin: 0 auto 20px;
+    }
+
+    /* Admin table */
+    .admin-header {
+      padding: 28px 0 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .status-pill {
+      font-size: 11px;
+      padding: 2px 9px;
+      border-radius: 20px;
+      font-weight: 500;
+    }
+    .s-scored  { background: var(--success-bg); color: var(--success); }
+    .s-pending { background: var(--warn-bg);    color: var(--warn);    }
+    .s-judging { background: var(--info-bg);    color: var(--info);    }
+    .s-error   { background: var(--danger-bg);  color: var(--danger);  }
+
+    .del-btn {
+      background: none;
+      border: 1px solid rgba(153,60,29,.3);
+      color: var(--danger);
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: background .15s;
+      white-space: nowrap;
+    }
+    .del-btn:hover { background: var(--danger-bg); }
+    .del-all-btn {
+      background: var(--danger);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius-sm);
+      padding: 9px 18px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .15s;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .del-all-btn:hover { background: #7a2e12; }
+
+    /* Confirm overlay */
+    .confirm-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.5);
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+      padding: 24px;
+    }
+    .confirm-overlay.show { display: flex; }
+    .confirm-box {
+      background: var(--surface);
+      border-radius: var(--radius-lg);
+      padding: 28px 32px;
+      max-width: 380px;
+      width: 100%;
+      box-shadow: 0 8px 40px rgba(0,0,0,.2);
+    }
+    .confirm-title { font-size: 17px; font-weight: 700; margin-bottom: 8px; }
+    .confirm-sub { font-size: 13px; color: var(--text-2); margin-bottom: 20px; line-height: 1.6; }
+    .confirm-footer { display: flex; gap: 10px; }
+
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .stat-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 14px 16px;
+      text-align: center;
+    }
+    .stat-num { font-size: 28px; font-weight: 800; }
+    .stat-lbl { font-size: 11px; color: var(--text-3); margin-top: 2px; text-transform: uppercase; letter-spacing: .06em; }
+  </style>
+</head>
+<body>
+
+<!-- Login screen -->
+<div class="login-wrap" id="login-screen">
+  <div class="login-box">
+    <div class="admin-icon"><i class="fa-solid fa-shield-halved"></i></div>
+    <h2 style="font-size:20px;font-weight:700;margin-bottom:6px">Admin Panel</h2>
+    <p style="font-size:13px;color:var(--text-2);margin-bottom:24px;line-height:1.5">Enter your admin credentials to continue</p>
+
+    <div style="text-align:left;margin-bottom:12px">
+      <label style="font-size:13px;font-weight:500;color:var(--text-2);margin-bottom:5px;display:block">Username</label>
+      <input class="input" id="admin-username-input" type="text" placeholder="Admin username"
+        autocomplete="off" onkeydown="if(event.key==='Enter')document.getElementById('admin-key-input').focus()"/>
+    </div>
+    <div style="text-align:left;margin-bottom:16px">
+      <label style="font-size:13px;font-weight:500;color:var(--text-2);margin-bottom:5px;display:block">Password</label>
+      <div style="position:relative">
+        <input class="input" id="admin-key-input" type="password" placeholder="Admin password"
+          style="padding-right:42px" onkeydown="if(event.key==='Enter')login()"/>
+        <button onclick="toggleLoginPwd()" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-3);font-size:14px">
+          <i class="fa-solid fa-eye" id="login-eye"></i>
+        </button>
+      </div>
+    </div>
+
+    <button class="btn btn-primary full-width" onclick="login()">
+      <i class="fa-solid fa-unlock"></i> Access Admin Panel
+    </button>
+    <p id="login-error" style="display:none;color:var(--danger);font-size:13px;margin-top:12px"></p>
+  </div>
+</div>
+
+<!-- Admin dashboard (hidden until login) -->
+<div id="admin-screen" style="display:none">
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="logo">
+        <span class="logo-icon" style="background:var(--danger)"><i class="fa-solid fa-shield-halved"></i></span>
+        HackJudge Admin
+      </div>
+      <span style="font-size:12px;color:var(--text-3);margin-left:8px">— not visible to participants</span>
+      <nav class="nav" style="margin-left:auto">
+        <a href="/" style="color:var(--text-2);text-decoration:none;font-size:13px">
+          <i class="fa-solid fa-arrow-left"></i> Back to site
+        </a>
+        <button onclick="logout()" class="btn btn-secondary" style="font-size:13px;padding:6px 14px">
+          <i class="fa-solid fa-right-from-bracket"></i> Logout
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <div class="page-wrap page-wrap--lg" style="padding-top:0">
+    <div class="admin-header">
+      <div>
+        <h1 class="page-title" style="font-size:22px">Submissions</h1>
+        <p class="page-sub" style="font-size:13px" id="last-refresh">Loading…</p>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn btn-secondary" onclick="loadSubmissions()" style="font-size:13px">
+          <i class="fa-solid fa-rotate"></i> Refresh
+        </button>
+        <button class="del-all-btn" onclick="confirmDeleteAll()">
+          <i class="fa-solid fa-trash-can"></i> Delete all
+        </button>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-row" id="stats-row">
+      <div class="stat-box"><div class="stat-num" id="s-total">—</div><div class="stat-lbl">Total</div></div>
+      <div class="stat-box"><div class="stat-num" style="color:var(--success)" id="s-scored">—</div><div class="stat-lbl">Scored</div></div>
+      <div class="stat-box"><div class="stat-num" style="color:var(--warn)" id="s-pending">—</div><div class="stat-lbl">Pending</div></div>
+      <div class="stat-box"><div class="stat-num" style="color:var(--danger)" id="s-error">—</div><div class="stat-lbl">Error</div></div>
+    </div>
+
+    <!-- Table -->
+    <div class="card">
+      <div class="table-wrap">
+        <table style="table-layout:fixed;width:100%">
+          <colgroup>
+            <col style="width:80px"/>
+            <col style="width:150px"/>
+            <col style="width:160px"/>
+            <col style="width:130px"/>
+            <col style="width:90px"/>
+            <col style="width:70px"/>
+            <col style="width:140px"/>
+            <col style="width:90px"/>
+          </colgroup>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Team</th>
+              <th>Project</th>
+              <th>Track</th>
+              <th>Status</th>
+              <th>Score</th>
+              <th>Submitted</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="admin-tbody">
+            <tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-3)">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div style="height:48px"></div>
+  </div>
+</div>
+
+<!-- Confirm delete single -->
+<div class="confirm-overlay" id="confirm-single">
+  <div class="confirm-box">
+    <div class="confirm-title"><i class="fa-solid fa-triangle-exclamation" style="color:var(--danger);margin-right:8px"></i>Delete submission?</div>
+    <div class="confirm-sub" id="confirm-single-msg">This cannot be undone.</div>
+    <div class="confirm-footer">
+      <button class="btn btn-secondary" style="flex:1" onclick="closeConfirm('confirm-single')">Cancel</button>
+      <button class="btn" style="flex:1;background:var(--danger);color:#fff" id="confirm-single-ok">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm delete all -->
+<div class="confirm-overlay" id="confirm-all">
+  <div class="confirm-box">
+    <div class="confirm-title"><i class="fa-solid fa-triangle-exclamation" style="color:var(--danger);margin-right:8px"></i>Delete ALL submissions?</div>
+    <div class="confirm-sub">This will permanently remove every submission and score. The leaderboard will be empty. This cannot be undone.</div>
+    <div class="confirm-footer">
+      <button class="btn btn-secondary" style="flex:1" onclick="closeConfirm('confirm-all')">Cancel</button>
+      <button class="btn" style="flex:1.5;background:var(--danger);color:#fff" onclick="deleteAll()">
+        <i class="fa-solid fa-trash-can"></i> Yes, delete all
+      </button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-area"></div>
+
+<script>
+let adminUser = '';
+let adminPass = '';
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+
+// Auto-login if credentials were passed from the leaderboard modal
+window.addEventListener('DOMContentLoaded', () => {
+  const u = sessionStorage.getItem('admin_user');
+  const p = sessionStorage.getItem('admin_pass');
+  sessionStorage.removeItem('admin_user');
+  sessionStorage.removeItem('admin_pass');
+  if (u && p) {
+    adminUser = u; adminPass = p;
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('admin-screen').style.display = 'block';
+    loadSubmissions();
+  }
+});
+
+async function login() {
+  const u = document.getElementById('admin-username-input').value.trim();
+  const p = document.getElementById('admin-key-input').value.trim();
+  if (!u || !p) return;
+
+  try {
+    const r = await fetch('/api/admin/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: u, password: p }),
+    });
+    if (r.status === 403) {
+      document.getElementById('login-error').textContent = 'Incorrect username or password.';
+      document.getElementById('login-error').style.display = 'block';
+      document.getElementById('admin-key-input').value = '';
+      return;
+    }
+    adminUser = u; adminPass = p;
+    document.getElementById('admin-username-input').value = '';
+    document.getElementById('admin-key-input').value = '';
+    document.getElementById('login-screen').style.display  = 'none';
+    document.getElementById('admin-screen').style.display  = 'block';
+    loadSubmissions();
+  } catch (e) {
+    document.getElementById('login-error').textContent = 'Connection error: ' + e.message;
+    document.getElementById('login-error').style.display = 'block';
+  }
+}
+
+function logout() {
+  adminUser = ''; adminPass = '';
+  document.getElementById('admin-screen').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+}
+
+// ── Data ──────────────────────────────────────────────────────────────────────
+async function loadSubmissions() {
+  try {
+    const r    = await fetch(`/api/admin/submissions?username=${encodeURIComponent(adminUser)}&password=${encodeURIComponent(adminPass)}`);
+    const data = await r.json();
+    if (r.status === 403) { logout(); return; }
+
+    renderStats(data);
+    renderTable(data);
+    document.getElementById('last-refresh').textContent =
+      `Last refreshed: ${new Date().toLocaleTimeString()}  ·  ${data.length} total submissions`;
+  } catch (e) {
+    showToast('Failed to load: ' + e.message, true);
+  }
+}
+
+function renderStats(data) {
+  document.getElementById('s-total').textContent   = data.length;
+  document.getElementById('s-scored').textContent  = data.filter(s => s.status === 'scored').length;
+  document.getElementById('s-pending').textContent = data.filter(s => ['pending','judging'].includes(s.status)).length;
+  document.getElementById('s-error').textContent   = data.filter(s => s.status === 'error').length;
+}
+
+function renderTable(data) {
+  const tbody = document.getElementById('admin-tbody');
+  if (!data.length) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:48px;color:var(--text-3)">
+      <i class="fa-solid fa-inbox" style="font-size:28px;display:block;margin-bottom:10px"></i>
+      No submissions yet
+    </td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = '';
+  data.forEach(sub => {
+    const statusClass = { scored:'s-scored', pending:'s-pending', judging:'s-judging', error:'s-error' }[sub.status] || 's-pending';
+    const date = new Date(sub.created_at).toLocaleString('en-IN', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+    const score = sub.total_score != null ? `<span style="font-weight:700;color:${scoreColor(sub.total_score)}">${Number(sub.total_score).toFixed(2)}</span>` : '—';
+
+    const tr = document.createElement('tr');
+    tr.id = `row-${sub.id}`;
+    tr.innerHTML = `
+      <td class="font-mono" style="font-size:12px;color:var(--text-3)">#${sub.id}</td>
+      <td style="font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${sub.team_name}">${sub.team_name}</td>
+      <td style="font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-2)" title="${sub.project_title}">${sub.project_title}</td>
+      <td style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><span class="badge badge-accent" style="font-size:11px">${sub.track||'—'}</span></td>
+      <td><span class="status-pill ${statusClass}">${sub.status}</span></td>
+      <td style="text-align:center">${score}</td>
+      <td style="font-size:12px;color:var(--text-3)">${date}</td>
+      <td>
+        <button class="del-btn" onclick="confirmDelete('${sub.id}','${sub.team_name.replace(/'/g,"\\'")}')">
+          <i class="fa-solid fa-trash-can"></i> Delete
+        </button>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function scoreColor(s) {
+  if (s >= 8) return 'var(--success)';
+  if (s >= 6) return 'var(--info)';
+  if (s >= 4) return 'var(--warn)';
+  return 'var(--danger)';
+}
+
+// ── Delete single ─────────────────────────────────────────────────────────────
+let pendingDeleteId = null;
+
+function confirmDelete(id, teamName) {
+  pendingDeleteId = id;
+  document.getElementById('confirm-single-msg').textContent =
+    `This will permanently delete "${teamName}" (#${id}). Cannot be undone.`;
+  document.getElementById('confirm-single').classList.add('show');
+  document.getElementById('confirm-single-ok').onclick = deleteSingle;
+}
+
+async function deleteSingle() {
+  closeConfirm('confirm-single');
+  try {
+    const r = await fetch(`/api/admin/submission/${pendingDeleteId}?username=${encodeURIComponent(adminUser)}&password=${encodeURIComponent(adminPass)}`, { method: 'DELETE' });
+    if (r.status === 403) { logout(); return; }
+    if (!r.ok) throw new Error((await r.json()).detail);
+    // Remove row from table without a full reload
+    const row = document.getElementById(`row-${pendingDeleteId}`);
+    if (row) row.remove();
+    showToast(`Deleted #${pendingDeleteId}`);
+    await loadSubmissions(); // refresh stats
+  } catch (e) {
+    showToast('Delete failed: ' + e.message, true);
+  }
+}
+
+// ── Delete all ────────────────────────────────────────────────────────────────
+function confirmDeleteAll() {
+  document.getElementById('confirm-all').classList.add('show');
+}
+
+async function deleteAll() {
+  closeConfirm('confirm-all');
+  try {
+    const r = await fetch(`/api/admin/submissions/all?username=${encodeURIComponent(adminUser)}&password=${encodeURIComponent(adminPass)}`, { method: 'DELETE' });
+    if (r.status === 403) { logout(); return; }
+    const data = await r.json();
+    showToast(`Deleted ${data.deleted_count} submission${data.deleted_count !== 1 ? 's' : ''}`);
+    await loadSubmissions();
+  } catch (e) {
+    showToast('Delete all failed: ' + e.message, true);
+  }
+}
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+function closeConfirm(id) {
+  document.getElementById(id).classList.remove('show');
+}
+
+function showToast(msg, isError = false) {
+  const area = document.getElementById('toast-area');
+  const t = document.createElement('div');
+  t.className = 'toast' + (isError ? ' toast-error' : '');
+  t.textContent = msg;
+  area.appendChild(t);
+  setTimeout(() => t.remove(), 4000);
+}
+
+function toggleLoginPwd() {
+  const inp = document.getElementById('admin-key-input');
+  const ico = document.getElementById('login-eye');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+  ico.className = inp.type === 'password' ? 'fa-solid fa-eye' : 'fa-solid fa-eye-slash';
+}
+
+// Close confirm overlays on background click
+document.addEventListener('click', e => {
+  ['confirm-single','confirm-all'].forEach(id => {
+    const el = document.getElementById(id);
+    if (e.target === el) el.classList.remove('show');
+  });
+});
+
+// Allow Enter on login
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && document.activeElement?.id === 'admin-key-input') login();
+  if (e.key === 'Enter' && document.activeElement?.id === 'admin-username-input') document.getElementById('admin-key-input').focus();
+});
+</script>
+</body>
+</html>
